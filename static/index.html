@@ -231,6 +231,21 @@
   .task .due.warn { color: var(--warn); }
   .task .due.alert { color: var(--alert); }
 
+  /* Linear cycle strip */
+  .cycle-strip {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 4px 0 8px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 6px;
+  }
+  .cycle-strip .bar { color: var(--cyan); letter-spacing: -1px; }
+  .cycle-strip .warn { color: var(--amber); }
+  .cycle-strip .alert { color: var(--magenta); }
+
   /* Calendar */
   .cal-row {
     display: grid;
@@ -1120,13 +1135,69 @@ function renderLinear(state) {
 function renderLinearPanel(label, safe, p) {
   const metaId = 'linear-meta-' + safe;
   const bodyId = 'linear-body-' + safe;
-  if (!el(bodyId)) return;
+  const meta = el(metaId);
+  const body = el(bodyId);
+  if (!meta || !body) return;
+
   setMeta(metaId, p);
+
   if (!p || p.status === 'pending') {
     setHtml(bodyId, '<div class="dim">loading…</div>');
     return;
   }
-  setHtml(bodyId, '<div class="dim">stub — workspace=' + escapeHtml(label) + ' status=' + escapeHtml(p.status||'?') + '</div>');
+  if (p.status === 'error') {
+    setHtml(metaId, '<span class="err">ERR</span> <span class="dim">' + escapeHtml((p.error||'').slice(0,80)) + '</span>');
+    if (body.textContent.trim() === '' || body.textContent.toLowerCase().includes('loading')) {
+      setHtml(bodyId, '<div class="err">' + escapeHtml(p.error || 'error') + '</div>');
+    }
+    return;
+  }
+
+  const issues = p.issues || { open_count: 0, items: [] };
+  const cycle = p.cycle || { present: false };
+
+  meta.textContent = (issues.open_count ?? 0) + ' OPEN';
+
+  let html = '';
+
+  if (cycle.present) {
+    const days = cycle.ends_in_days;
+    let endsTxt, endsCls;
+    if (days < 0)       { endsTxt = 'PAST DUE'; endsCls = 'alert'; }
+    else if (days <= 1) { endsTxt = 'ENDS ' + (days === 0 ? 'TODAY' : 'TMRW'); endsCls = 'warn'; }
+    else                { endsTxt = 'ENDS ' + days + 'D'; endsCls = ''; }
+    const bar = fmtBar(cycle.progress_pct || 0, 12);
+    const multi = cycle.multi_team ? ' <span class="dim">+MORE</span>' : '';
+    html += '<div class="cycle-strip">'
+      + '<span class="dim">CYCLE ' + escapeHtml(String(cycle.number ?? '')) + '</span>'
+      + '<span class="' + endsCls + '">' + escapeHtml(endsTxt) + '</span>'
+      + '<span class="bar">' + escapeHtml(bar) + '</span>'
+      + '<span class="dim">' + (cycle.progress_pct || 0) + '%</span>'
+      + '<span class="dim">' + (cycle.completed || 0) + '/' + (cycle.total || 0) + '</span>'
+      + multi
+      + '</div>';
+  }
+
+  const items = issues.items || [];
+  if (items.length === 0) {
+    html += '<div class="dim">no open issues</div>';
+  } else {
+    html += items.map(it => {
+      const pri = it.priority === 'high' ? '!' : ' ';
+      const dueCls = it.due === 'TODAY' ? 'warn'
+                    : (it.due === 'OVERDUE' ? 'alert'
+                    : (/\d+D$/.test(it.due || '') ? 'alert' : 'dim'));
+      const ident = it.identifier ? '<span class="dim">' + escapeHtml(it.identifier) + '</span> ' : '';
+      return '<div class="task">'
+        + '<span class="pri">' + pri + '</span>'
+        + '<span class="src">' + escapeHtml(it.team || '') + '</span>'
+        + '<span class="title">' + ident + escapeHtml(it.title || '') + '</span>'
+        + '<span class="due ' + dueCls + '">' + escapeHtml(it.due || '') + '</span>'
+        + '</div>';
+    }).join('');
+  }
+
+  setHtml(bodyId, html);
 }
 
 function renderGithub(p) {
