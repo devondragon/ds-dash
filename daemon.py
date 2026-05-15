@@ -260,6 +260,9 @@ async def mock_claude_poll() -> None:
         await asyncio.sleep(15)
 
 
+NET_HISTORY_SIZE = 60  # 60 samples * 5s = 5min of net trace at the default poll interval
+
+
 async def system_poll(interval: int = 5) -> None:
     """System stats via psutil. Network rates are computed between polls."""
     host = socket.gethostname().split(".")[0]
@@ -272,15 +275,19 @@ async def system_poll(interval: int = 5) -> None:
     psutil.cpu_percent(interval=None)
     prev_net = psutil.net_io_counters()
     prev_ts = time.monotonic()
+    history: list[dict] = []
 
     while True:
         try:
             now_ts = time.monotonic()
             dt = max(1e-3, now_ts - prev_ts)
             net = psutil.net_io_counters()
-            up_mbps = ((net.bytes_sent - prev_net.bytes_sent) * 8) / dt / 1_000_000
-            down_mbps = ((net.bytes_recv - prev_net.bytes_recv) * 8) / dt / 1_000_000
+            up_mbps = round(max(0.0, ((net.bytes_sent - prev_net.bytes_sent) * 8) / dt / 1_000_000), 2)
+            down_mbps = round(max(0.0, ((net.bytes_recv - prev_net.bytes_recv) * 8) / dt / 1_000_000), 2)
             prev_net, prev_ts = net, now_ts
+
+            history.append({"up": up_mbps, "down": down_mbps})
+            del history[:-NET_HISTORY_SIZE]
 
             uptime_secs = int(time.time() - boot_ts)
             days, rem = divmod(uptime_secs, 86400)
@@ -293,8 +300,9 @@ async def system_poll(interval: int = 5) -> None:
                 "cpu_percent": int(psutil.cpu_percent(interval=None)),
                 "mem_percent": int(psutil.virtual_memory().percent),
                 "disk_percent": int(psutil.disk_usage(disk_root).percent),
-                "net_up_mbps": round(max(0.0, up_mbps), 1),
-                "net_down_mbps": round(max(0.0, down_mbps), 1),
+                "net_up_mbps": up_mbps,
+                "net_down_mbps": down_mbps,
+                "net_history": list(history),  # snapshot — frontend reads, backend keeps mutating
                 "uptime": f"{days}d {hours:02d}h {mins:02d}m",
                 "host": host,
             }

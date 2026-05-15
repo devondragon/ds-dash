@@ -490,17 +490,43 @@
   .rail-row .v { color: var(--cyan); }
   .rail-row.live .v { color: var(--amber); }
 
-  .rail-log .log-line {
-    color: var(--dim);
-    font-size: 10px;
-    margin: 1px 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  /* NET TRACE oscilloscope (right rail) */
+  .rail-row .v.amber-v { color: var(--amber); }
+  .rail-row .v.cyan-v { color: var(--cyan); }
+  .rail-row .v .unit { color: var(--primary-deep); font-size: 9px; margin-left: 4px; letter-spacing: 0.1em; }
+
+  .net-trace {
+    width: 100%;
+    height: 80px;
+    display: block;
+    margin: 8px 0 4px;
+    background: rgba(15, 36, 75, 0.4);
+    border: 1px solid var(--rule);
+    clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px);
   }
-  .rail-log .log-line .ts { color: var(--primary-deep); margin-right: 6px; }
-  .rail-log .log-line.warn { color: var(--amber); }
-  .rail-log .log-line.lk { color: var(--cyan); }
+  .net-trace .trace-grid { stroke: var(--rule); stroke-width: 0.5; fill: none; opacity: 0.6; }
+  .net-trace .trace-up {
+    fill: none;
+    stroke: var(--amber);
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
+    filter: drop-shadow(0 0 3px rgba(255, 170, 68, 0.5));
+  }
+  .net-trace .trace-down {
+    fill: none;
+    stroke: var(--cyan);
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
+    filter: drop-shadow(0 0 3px rgba(95, 200, 232, 0.4));
+  }
+  .trace-axis {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: var(--primary-deep);
+    letter-spacing: 0.18em;
+    padding: 0 2px;
+  }
 
   /* faint ASCII radar arcs as background flavor in the rail */
   .rail-radar {
@@ -652,34 +678,31 @@
   </div>
 </aside>
 
-<!-- RIGHT RAIL (4K only — decorative activity log) -->
+<!-- RIGHT RAIL (4K only — real net oscilloscope + bus status from psutil) -->
 <aside class="rail rail-right">
-  <div class="rail-section rail-log">
-    <h4>NET · ACTIVITY</h4>
-    <div class="log-line lk"><span class="ts">20:43:18</span>LNK ESTAB 192.168.1.4:443</div>
-    <div class="log-line"><span class="ts">20:43:17</span>BUS GAIN +8.29</div>
-    <div class="log-line lk"><span class="ts">20:43:15</span>LK-R3 NODE READY</div>
-    <div class="log-line"><span class="ts">20:43:14</span>BVA PHASE LOCK</div>
-    <div class="log-line"><span class="ts">20:43:12</span>OUTBOUND 10.0.0.1:8080</div>
-    <div class="log-line"><span class="ts">20:43:09</span>FRD DRIFT NIL</div>
-    <div class="log-line"><span class="ts">20:43:08</span>R2 DB QUERY OK</div>
-    <div class="log-line warn"><span class="ts">20:43:05</span>FREQ ANALYSIS HOLD</div>
-    <div class="log-line lk"><span class="ts">20:43:02</span>CLAUDE: API healthy</div>
-    <div class="log-line"><span class="ts">20:42:58</span>PHASE +27.8°</div>
-    <div class="log-line"><span class="ts">20:42:55</span>OUTPUT BUS A LIVE</div>
-    <div class="log-line"><span class="ts">20:42:51</span>INBOUND 198.51.100.4:8443</div>
-    <div class="log-line"><span class="ts">20:42:48</span>LATCH HOLD CONFIRM</div>
-    <div class="log-line"><span class="ts">20:42:45</span>AES KEY EXCHANGE</div>
-    <div class="log-line"><span class="ts">20:42:42</span>R4 DB SYNC OK</div>
+  <div class="rail-section">
+    <h4>NET · TRACE</h4>
+    <div class="rail-row"><span class="code">UP</span><span class="v amber-v"><span id="net-up">--.-</span><span class="unit">Mbps</span></span></div>
+    <div class="rail-row"><span class="code">DOWN</span><span class="v cyan-v"><span id="net-down">--.-</span><span class="unit">Mbps</span></span></div>
+    <svg class="net-trace" id="net-trace" viewBox="0 0 240 80" preserveAspectRatio="none">
+      <path class="trace-grid" d="M0 20 L240 20 M0 40 L240 40 M0 60 L240 60" />
+      <path class="trace-down" id="net-trace-down" d="" />
+      <path class="trace-up" id="net-trace-up" d="" />
+    </svg>
+    <div class="trace-axis">
+      <span>−5min</span>
+      <span id="trace-peak" class="dim">peak --.-</span>
+      <span>now</span>
+    </div>
   </div>
   <div class="rail-section">
     <h4>BUS · STATUS</h4>
-    <div class="rail-row"><span class="code">BUS A</span><span class="v">7A</span></div>
-    <div class="rail-row live"><span class="code">GAIN</span><span class="v">+8.29</span></div>
-    <div class="rail-row"><span class="code">PHASE</span><span class="v">+27.8°</span></div>
-    <div class="rail-row"><span class="code">LOCK</span><span class="v">LK-R3</span></div>
-    <div class="rail-row"><span class="code">FILTER</span><span class="v">FULL</span></div>
-    <div class="rail-row"><span class="code">DRIFT</span><span class="v">NIL</span></div>
+    <div class="rail-row" data-bus="cpu"><span class="code">CPU</span><span class="v">--%</span></div>
+    <div class="rail-row" data-bus="mem"><span class="code">MEM</span><span class="v">--%</span></div>
+    <div class="rail-row" data-bus="disk"><span class="code">DISK</span><span class="v">--%</span></div>
+    <div class="rail-row" data-bus="host"><span class="code">HOST</span><span class="v">--</span></div>
+    <div class="rail-row" data-bus="filter"><span class="code">FILTER</span><span class="v">--</span></div>
+    <div class="rail-row" data-bus="drift"><span class="code">DRIFT</span><span class="v">--</span></div>
   </div>
 </aside>
 
@@ -1026,6 +1049,58 @@ function renderHeatmap(p) {
   `);
 }
 
+function renderRail(sys) {
+  // Right rail — real numbers from psutil. Cheap to update even when rail is display:none.
+  if (!sys || sys.status === 'pending') return;
+
+  const upEl = el('net-up');
+  const downEl = el('net-down');
+  if (upEl) upEl.textContent = (sys.net_up_mbps ?? 0).toFixed(1);
+  if (downEl) downEl.textContent = (sys.net_down_mbps ?? 0).toFixed(1);
+
+  const hist = sys.net_history || [];
+  const pUp = el('net-trace-up');
+  const pDown = el('net-trace-down');
+  const peakEl = el('trace-peak');
+  if (pUp && pDown) {
+    if (hist.length < 2) {
+      pUp.setAttribute('d', '');
+      pDown.setAttribute('d', '');
+      if (peakEl) peakEl.textContent = 'peak --.-';
+    } else {
+      const maxVal = Math.max(0.1, ...hist.flatMap(s => [s.up, s.down]));
+      const W = 240, H = 80, n = hist.length;
+      const path = (key) => hist.map((s, i) => {
+        const x = (i / (n - 1)) * W;
+        const y = H - (s[key] / maxVal) * (H - 4) - 2;
+        return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+      }).join(' ');
+      pUp.setAttribute('d', path('up'));
+      pDown.setAttribute('d', path('down'));
+      if (peakEl) peakEl.textContent = 'peak ' + maxVal.toFixed(1);
+    }
+  }
+
+  const bus = {
+    cpu:    (sys.cpu_percent ?? 0) + '%',
+    mem:    (sys.mem_percent ?? 0) + '%',
+    disk:   (sys.disk_percent ?? 0) + '%',
+    host:   (sys.host || '—').toUpperCase(),
+    filter: sys.status === 'ok' ? 'FULL' : (sys.status || '—').toUpperCase(),
+    drift:  shortenUptime(sys.uptime),
+  };
+  document.querySelectorAll('.rail-right [data-bus]').forEach(row => {
+    const v = row.querySelector('.v');
+    if (v) v.textContent = bus[row.dataset.bus] ?? '—';
+  });
+}
+
+function shortenUptime(s) {
+  if (!s) return '—';
+  const m = s.match(/(\d+)d\s+(\d+)h/);
+  return m ? `${m[1]}D ${m[2]}H` : s.toUpperCase();
+}
+
 function renderSystem(sys) {
   if (!sys || sys.status === 'pending') { setText('syschip', 'CPU --% · MEM --% · UP --'); return; }
   const cpu = sys.cpu_percent ?? 0;
@@ -1073,6 +1148,7 @@ async function poll() {
     renderGithub(p.github);
     renderHeatmap(p.github);
     renderSystem(p.system);
+    renderRail(p.system);
 
     if ((s.ticker || []).length !== lastTickerLen) {
       renderTicker(s.ticker || []);
