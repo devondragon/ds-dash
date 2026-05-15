@@ -27,3 +27,10 @@ config.toml
 .env
 .env.*
 !.env.example
+
+# Preview screenshots (local-only artifacts from devtools snapshots)
+.nightops-*.png
+.nightops-*.jpg
+.nightops-*.jpeg
+.*-preview.png
+.*-preview.jpg
