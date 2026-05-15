@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import math
 import os
 import re
 import shutil
@@ -521,6 +522,7 @@ _LINEAR_MIN_INTERVAL = 60        # floor for poll_seconds
 _LINEAR_DEFAULT_INTERVAL = 90
 
 # Linear priority int -> (sort rank, frontend bucket).
+# Rank distinguishes urgent (1) from high (2) for sort order; the OUT bucket collapses both to "high" for display.
 _LINEAR_PRI_RANK = {1: 0, 2: 1, 3: 2, 4: 3, 0: 4}
 _LINEAR_PRI_OUT  = {1: "high", 2: "high", 3: "med", 4: "low", 0: "none"}
 
@@ -540,7 +542,7 @@ query DashboardSnapshot {
         url
         state { name type }
         team { key }
-        cycle { number id }
+
       }
     }
   }
@@ -561,7 +563,6 @@ query DashboardSnapshot {
 
 
 def _neg_epoch(iso: str | None) -> float:
-    """Negative epoch seconds — used in sort tuples for descending order via ascending sort."""
     if not iso:
         return 0.0
     try:
@@ -593,7 +594,6 @@ def _linear_to_item(node: dict) -> dict:
 
 
 def _linear_sort_key(item: dict) -> tuple:
-    """Priority rank asc, due date asc (None last), updatedAt desc."""
     return (item["_pri_rank"], item["_due_iso"], item["_updated_at_neg"])
 
 
@@ -603,7 +603,6 @@ def _linear_active_cycle(nodes: list[dict]) -> dict:
     Local sanity-check on startsAt/endsAt to defend against clock skew.
     Returns {"present": False} when no active cycle.
     """
-    import math
     now = datetime.now(timezone.utc)
     actives: list[tuple] = []
     for c in nodes or []:
@@ -882,7 +881,6 @@ async def services_poll(interval: int = 300) -> None:
 
 def _sin_seconds(rate: float, phase: float = 0.0) -> float:
     """Smooth oscillator based on wall clock. Used by mock providers."""
-    import math
     return math.sin(datetime.now().timestamp() * rate + phase)
 
 
