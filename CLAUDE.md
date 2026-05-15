@@ -2,8 +2,8 @@
 
 A local-only personal dashboard. A Python daemon polls a handful of providers
 on a schedule and writes their state into a single in-memory blob; a single
-static HTML page polls that blob every 5s and renders a cyberpunk-themed grid
-of panels.
+static HTML page polls that blob every 5s and renders a cinematic ops
+console.
 
 Everything runs on `localhost`. No build step. No database. State is the
 process memory; on restart, providers re-poll from scratch.
@@ -37,7 +37,7 @@ daemon.py            FastAPI app, STATE blob, all provider pollers
 static/index.html    Single-page frontend (HTML + inline CSS + inline JS)
 config.example.toml  Starter config; copied to ~/.cowork-dash/config.toml on first run
 run.sh               Bootstraps .venv, copies starter config, runs the daemon
-requirements.txt     fastapi, uvicorn, httpx, tomli (3.10 fallback)
+requirements.txt     fastapi, uvicorn, httpx, psutil, tomli (3.10 fallback)
 ```
 
 Config lives **outside** the repo at `~/.cowork-dash/config.toml` so secrets
@@ -46,27 +46,27 @@ never get committed. Override with `COWORK_DASH_CONFIG=/path/to/file`.
 ## Provider polling pattern
 
 Every provider is an `async def` coroutine that loops forever, writes a
-result dict to `STATE["providers"][name]`, and sleeps. The result dict must
-include `status` and `updated_at`; everything else is provider-specific and
-the frontend renderer for that panel decides how to use it.
+result dict to `STATE["providers"][name]`, and sleeps. The result dict
+must include `status` and `updated_at`; everything else is
+provider-specific and the renderer for that panel decides how to use it.
 
-Skeleton for a new provider:
+### API-backed provider (skeleton)
 
 ```python
 async def myprovider_poll(api_key: str, interval: int = 60) -> None:
     """One-line description of what this polls."""
+    headers = {"Authorization": f"Bearer {api_key}"}
     while True:
-        result: dict[str, Any] = {"updated_at": _now_iso()}
         try:
-            async with httpx.AsyncClient(timeout=30) as c:
-                r = await c.get("https://api.example.com/thing",
-                                headers={"Authorization": f"Bearer {api_key}"})
+            async with httpx.AsyncClient(timeout=20, headers=headers) as c:
+                r = await c.get("https://api.example.com/thing")
                 r.raise_for_status()
                 data = r.json()
-                # ...shape `data` into the keys the frontend renderer expects...
-                result["items"] = [...]
-            result["status"] = "ok"
-            STATE["providers"]["myprovider"] = result
+            STATE["providers"]["myprovider"] = {
+                "status": "ok",
+                "updated_at": _now_iso(),
+                "items": [...],   # shape per the renderer
+            }
         except httpx.HTTPStatusError as e:
             STATE["providers"]["myprovider"] = {
                 "status": "error",
@@ -87,9 +87,9 @@ Wiring it up in `lifespan`:
 ```python
 mp = cfg.get("myprovider") or {}
 if mp.get("api_key"):
-    BACKGROUND_TASKS.append(
-        asyncio.create_task(myprovider_poll(mp["api_key"], mp.get("poll_seconds", 60)))
-    )
+    BACKGROUND_TASKS.append(asyncio.create_task(
+        myprovider_poll(mp["api_key"], mp.get("poll_seconds", 60))
+    ))
     _push_ticker("daemon", "myprovider online", "info")
 else:
     STATE["providers"]["myprovider"] = {
@@ -98,9 +98,24 @@ else:
     }
 ```
 
-Also add the corresponding `[myprovider]` block to `config.example.toml` and
-seed `"myprovider": {"status": "pending"}` in the `STATE["providers"]` dict
-so the frontend sees the key from the first poll cycle.
+Also: add the `[myprovider]` block to `config.example.toml`, and seed
+`"myprovider": {"status": "pending"}` in `STATE["providers"]` so the
+frontend sees the key from the first render.
+
+### Local-only provider
+
+`system_poll` (psutil), `claude_poll` (`~/.claude/projects` jsonl scan),
+and `calendar_poll` (auto-detected ical-buddy) follow the same shape but
+skip the API-key check. They either always run or auto-detect their
+requirements. See those functions in `daemon.py` for working patterns.
+
+### Subprocess provider
+
+`calendar_poll` uses `asyncio.create_subprocess_exec` (argv array, no
+shell) to call ical-buddy. On `FileNotFoundError` or `OSError` (e.g.
+wrong-arch binary), it sets `status: "unconfigured"` and **`return`**s.
+Permanent config issues shouldn't loop forever — retry only transient
+failures.
 
 ## Status state vocabulary
 
@@ -114,45 +129,170 @@ Every `STATE["providers"][name]["status"]` is one of:
 | `unconfigured` | no credentials in config; daemon skipped starting the real poller         | shows `OFFLINE` + message |
 | `error`        | last poll raised; result also carries an `error` string                    | shows red `ERR` chip      |
 
-Reserve these five strings — don't invent new ones. The frontend's `metaTag`
-helper in `static/index.html` only knows these.
+Reserve these five strings — don't invent new ones. The frontend's
+`metaTag` helper in `static/index.html` only recognizes these.
 
 ## Conventions
 
-**Poll intervals** — pick one that respects the upstream's rate limit and
-matches how fast the data actually changes. Current defaults:
+### Poll intervals
+
+Current defaults:
 
 | provider | interval | reason                                                  |
 |----------|----------|---------------------------------------------------------|
 | github   | 180s     | search API is rate-limited; activity moves in minutes   |
 | services | 300s     | public status pages change rarely                       |
 | calendar | 60s      | "next event" needs minute-level freshness               |
-| tasks    | 30s      | feels responsive when checking things off               |
-| claude   | 15s      | usage bars should feel alive                            |
-| system   | 5s       | CPU/MEM are local + cheap                               |
+| motion   | 60s      | API rate-limit friendly; tasks change at minute scale   |
+| claude   | 60s      | full `~/.claude` scan; not worth more frequent          |
+| system   | 5s       | local + cheap, feeds net-trace history samples          |
 
-Anything that hits a third-party API: minimum 30s, prefer 60s+. Anything
-local-only: 5–15s is fine.
+Anything hitting a third-party API: minimum 30s, prefer 60s+. Local-only:
+5–60s is fine.
 
-**Error handling** — catch broadly, write `status: "error"` with a short
-`error` string. Never let an exception escape the `while True` — that kills
-the task and the panel goes stale forever.
+### Error handling
 
-**Ticker events** — only push when something actually happened (a new PR
-review request, a contribution count delta, a service going from `ok` to
-`major`). Don't push on every poll. Levels are `info` / `warn` / `alert`
-and map to color in the frontend.
+Catch broadly, write `status: "error"` with a short `error` string.
+**Never let an exception escape the `while True`** — that kills the
+task and the panel goes stale forever. Permanent config errors should
+set `status: "unconfigured"` and `return` instead.
 
-**Secrets** — read from `config.toml` only. Never read from environment
-variables for provider credentials, never log a token. Config sample lives
-in `config.example.toml`; the real file is at `~/.cowork-dash/config.toml`
-(outside the repo).
+### Ticker events
 
-**Time** — use `_now_iso()` for every `updated_at`. UTC, ISO-8601. The
-frontend converts to "Xs ago" relative to `Date.now()`.
+Only push when something actually happened (a new PR review request,
+contribution-count delta, service going from `ok` to `major`). Don't
+push on every poll. Levels are `info` / `warn` / `alert` and map to
+color in the frontend.
 
-**Frontend** — single file, no build step, no dependencies beyond two
-Google Fonts. If a panel needs a new renderer, add a `renderFoo(p)`
-function alongside the others and call it from `poll()`. Renderers must
-handle `status === 'pending'` (show `loading…`) and `status === 'error'`
-(show the `err` chip).
+### Secrets
+
+Read from `config.toml` only. Never read environment variables for
+provider credentials, never log a token. Config sample lives in
+`config.example.toml`; the real file is at `~/.cowork-dash/config.toml`
+(outside the repo, `chmod 600`).
+
+### Time
+
+Use `_now_iso()` for every `updated_at`. UTC, ISO-8601. The frontend
+converts to "Xs ago" relative to `Date.now()`.
+
+## Frontend (`static/index.html`)
+
+Single file, no build step. Three Google Font families: Inter + Bebas
+Neue + IBM Plex Mono.
+
+### Layout
+
+- **Header strip** — REC pulse · `OPERATOR://DEVON [ON STATION]` · gold
+  Bebas Neue timecode · CPU/MEM/UPTIME chip · 60×12 net sparkline ·
+  weather.
+- **3-column grid** of panels — left: Services/Claude/CC sessions ·
+  center: Calendar/Tasks · right: GitHub/Heatmap.
+- **Ticker** along the bottom — scrolling rolling events.
+- **Left + right rails** (visible only at ≥ 2400px) — decorative +
+  real-data hybrid. Left: TRACE FREQ + FREQ TRACE + radar sweep. Right:
+  NET TRACE oscilloscope + BUS STATUS chips.
+
+### Render functions
+
+Each panel has a `renderXxx(p)` function, all called from `poll()` every
+5s with that panel's slice of state. Renderers must handle
+`status === 'pending'` (show `loading…`) and `status === 'error'` (show
+the `.err` chip). To add a panel: add the HTML, write `renderXxx`, wire
+into `poll()`.
+
+### Real-time traces
+
+`tracePath(hist, key, W, H, maxVal)` builds an SVG path string from a
+history array. `updateNetTraces(hist)` writes that path into **both**
+the 240×80 right-rail oscilloscope **and** the 60×12 header sparkline,
+using the same auto-scaled max. To add another trace target (e.g. a CPU
+oscilloscope): add an `id` to the SVG `<path>`, then a row to
+`updateNetTraces`'s `targets` array.
+
+### Rail data binding
+
+Decorative rail rows bind to live state via HTML data attributes:
+
+| attribute                | source                                | handler          |
+|--------------------------|---------------------------------------|------------------|
+| `data-bus="cpu"` etc.    | `sys.{cpu_percent, mem_percent, …}`   | `renderRail`     |
+| `data-real="cpu"`        | `sys.cpu_percent`                     | `renderLeftRail` |
+| `data-real="cc-live"`    | `claude.cc_sessions.live`             | `renderLeftRail` |
+| `data-service="anthropic"` (etc.) | `services.items[name].indicator` → OK/MIN/MAJ/UNK | `renderLeftRail` |
+
+To bind a new rail row: add the `data-X` attribute, then handle in the
+relevant render function with `setRailValue(selector, text, stateCls)`.
+State classes: `state-ok` (cyan), `state-warn` (amber), `state-alert`
+(magenta), `state-dim`.
+
+### Responsive breakpoints
+
+| viewport          | behavior                                                |
+|-------------------|---------------------------------------------------------|
+| `≥ 2400px`        | rails appear, fonts scale up, body becomes 3-col grid   |
+| `1400 – 2399px`   | default 3-col panel grid                                |
+| `≤ 1400px`        | drop heatmap, GitHub spans row 2 (2-col)                |
+| `≤ 900px`         | 1-col, hide CC sessions / weather / sys chip / sparkline|
+
+## Design system — NIGHTOPS
+
+Visual language is a synthesis of safehouse FUI (deep navy + cyan +
+amber, restrained / military), Cyberpunk 2077 (slashed angular corners,
+selective glow), and Tron (cold geometric, crisp). Avoid the
+neon-green-on-black "Matrix screensaver" trap.
+
+CSS variables live in `:root`. Old `--primary` / `--accent` / etc. are
+kept as aliases so existing style rules adopt the new palette without
+rewrites.
+
+### Palette
+
+| token        | hex        | role                                                |
+|--------------|------------|-----------------------------------------------------|
+| `--bg`       | `#03060f`  | near-black navy field                               |
+| `--panel`    | `#0a1530`  | panel fill                                          |
+| `--rule`     | `#1a3060`  | thin borders / dividers                             |
+| `--dim`      | `#3a7090`  | muted cyan — default label color                    |
+| `--cyan`     | `#5fc8e8`  | primary readout                                     |
+| `--amber`    | `#ffaa44`  | live values, active task chip                       |
+| `--gold`     | `#ffe88a`  | biggest readouts (timecode, primary numbers)        |
+| `--magenta`  | `#ff2a6d`  | alarms only — REC dot, OFFLINE, alert chips         |
+
+**Selective brightness** — most of the page is `--dim`. Only the
+timecode, the "next" calendar event, and any genuine alarm are bright.
+Avoid uniform glow.
+
+### Type stack
+
+| variable  | family          | use                                  |
+|-----------|-----------------|--------------------------------------|
+| `--sans`  | Inter           | labels, chrome, all-caps headers     |
+| `--vt`    | Bebas Neue      | display readouts (timecode)          |
+| `--mono`  | IBM Plex Mono   | tabular data, bars, codes, lists     |
+
+### Panel chrome — `.panel-nightops`
+
+Slashed top-left corner via stacked `::before` / `::after` pseudos with
+matching `clip-path`. Outer pseudo (`inset: 0`) = `--rule`; inner
+(`inset: 1px`) = `--panel`. The 1px offset between them paints the 1px
+slashed border ring. Add an optional `.panel-tabs` decorative tab strip
+at the top and a `.panel-stamp` (e.g. `LK-R3 · SP1-7`) at bottom-right
+for cinematic density.
+
+## Current provider state
+
+All seven panels are real:
+
+| panel         | source                                                                    |
+|---------------|---------------------------------------------------------------------------|
+| github        | api.github.com (PAT in config)                                            |
+| services      | public status.json endpoints (Anthropic / OpenAI / GH / Linear / Vercel)  |
+| system        | psutil — cpu, mem, disk, net (+ 5-min rolling history for trace)          |
+| calendar      | ical-buddy (Homebrew, auto-detected)                                      |
+| tasks         | api.usemotion.com /v1/tasks (with recurring-template dedup)               |
+| claude usage  | scan of `~/.claude/projects/**/*.jsonl` for user-message timestamps       |
+| cc sessions   | same scan, jsonl mtime → live / idle / today                              |
+
+Planned but not yet shipped: linear (would merge with motion in tasks),
+gmail.
