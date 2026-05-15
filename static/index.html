@@ -91,7 +91,7 @@
     letter-spacing: 0.14em;
     text-transform: uppercase;
     /* slashed top-left + bracketed bottom-right */
-    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+    clip-path: polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px);
   }
   .hdr .left { color: var(--dim); display: flex; align-items: center; gap: 12px; }
   .hdr .center {
@@ -391,7 +391,7 @@
   .panel-nightops::after {
     content: '';
     position: absolute;
-    clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+    clip-path: polygon(18px 0, 100% 0, 100% 100%, 0 100%, 0 18px);
     pointer-events: none;
   }
   .panel-nightops::before { inset: 0; background: var(--rule); }
@@ -419,7 +419,7 @@
     background: rgba(255, 170, 68, 0.07);
     box-shadow: inset 0 -1px 0 var(--amber);
   }
-  .panel-tabs .tab.dead { color: var(--primary-deeper); }
+  .panel-tabs .tab.dead { color: var(--primary-deep); opacity: 0.65; }
 
   .panel-body { padding: 10px 14px 14px; }
   .panel-body .panel-title {
@@ -446,10 +446,242 @@
     color: var(--amber);
     opacity: 0.85;
   }
+
+  /* ---------- decorative rails (4K only) ---------- */
+  .rail {
+    display: none;  /* shown at 4K via media query */
+    flex-direction: column;
+    gap: 14px;
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--dim);
+  }
+  .rail-section {
+    border: 1px solid var(--rule);
+    background: rgba(10, 21, 48, 0.45);
+    padding: 12px 14px;
+    position: relative;
+    clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+  }
+  .rail-section h4 {
+    margin: 0 0 8px 0;
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--cyan);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 5px;
+  }
+  .rail-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 2px 0;
+    font-size: 11px;
+  }
+  .rail-row .idx {
+    color: var(--primary-deep);
+    width: 22px;
+  }
+  .rail-row .code { color: var(--dim); }
+  .rail-row .v { color: var(--cyan); }
+  .rail-row.live .v { color: var(--amber); }
+
+  .rail-log .log-line {
+    color: var(--dim);
+    font-size: 10px;
+    margin: 1px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .rail-log .log-line .ts { color: var(--primary-deep); margin-right: 6px; }
+  .rail-log .log-line.warn { color: var(--amber); }
+  .rail-log .log-line.lk { color: var(--cyan); }
+
+  /* faint ASCII radar arcs as background flavor in the rail */
+  .rail-radar {
+    height: 200px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+    background: rgba(10, 21, 48, 0.45);
+  }
+  .rail-radar::before {
+    content: '';
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: 240px; height: 240px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 1px solid var(--rule);
+    box-shadow:
+      0 0 0 1px var(--rule) inset,
+      0 0 0 30px transparent,
+      0 0 0 31px var(--rule);
+  }
+  .rail-radar::after {
+    content: '';
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: 100px; height: 100px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 1px solid var(--rule);
+  }
+  .rail-radar .sweep {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: 110px;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--amber));
+    transform-origin: left center;
+    animation: sweep 4s linear infinite;
+  }
+  .rail-radar .blip {
+    position: absolute;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 6px var(--amber);
+  }
+  @keyframes sweep {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  /* ---------- responsive breakpoints ---------- */
+
+  /* 4K — show rails, scale everything up */
+  @media (min-width: 2400px) {
+    html, body { font-size: 15px; }
+    body {
+      padding: 22px;
+      display: grid;
+      grid-template-columns: 260px 1fr 280px;
+      grid-template-rows: 100%;
+      gap: 16px;
+      height: 100vh;
+    }
+    body::before, body::after { /* keep overlays full-viewport */ inset: 0; }
+    .layout { grid-column: 2; height: 100%; min-height: 0; }
+    .rail-left  { grid-column: 1; grid-row: 1; display: flex; }
+    .rail-right { grid-column: 3; grid-row: 1; display: flex; }
+
+    .hdr { padding: 14px 32px; font-size: 13px; }
+    .hdr .center { font-size: 48px; }
+    .hdr .right { gap: 24px; font-size: 12px; }
+    .hdr .op-status { font-size: 11px; }
+
+    .panel { padding: 14px 18px; }
+    .panel-tabs .tab { padding: 9px 14px; font-size: 11px; }
+    .panel-title { font-size: 13px; }
+
+    .grid { gap: 12px; }
+    .layout { gap: 12px; }
+
+    .ticker { padding: 8px 18px; font-size: 12px; }
+  }
+
+  /* Narrow tall (≤1400px) — drop heatmap, span github full-width on row 2 */
+  @media (max-width: 1400px) {
+    #panel-heatmap { display: none; }
+    .grid { grid-template-columns: 1fr 1fr; }
+    .grid > .col:nth-child(3) {
+      grid-column: 1 / -1;
+      flex-direction: row;
+      gap: 8px;
+    }
+    .grid > .col:nth-child(3) > .panel { flex: 1; }
+    .hdr { padding: 8px 14px; font-size: 10px; }
+    .hdr .center { font-size: 24px; }
+    .hdr .right { gap: 10px; }
+  }
+
+  /* Very narrow (≤900px) — single col, hide MOCK-only panels */
+  @media (max-width: 900px) {
+    body { padding: 8px; }
+    .grid { grid-template-columns: 1fr; }
+    .grid > .col:nth-child(3) { flex-direction: column; }
+    #panel-sessions { display: none; }
+    #weather, .hdr .right .sys { display: none; }
+    .hdr { font-size: 9px; padding: 6px 10px; }
+    .hdr .center { font-size: 20px; }
+    .ticker { font-size: 10px; }
+  }
 </style>
 </head>
 <body>
 <div class="offline-overlay"></div>
+
+<!-- LEFT RAIL (4K only — decorative trace freq + radar) -->
+<aside class="rail rail-left">
+  <div class="rail-section">
+    <h4>TRACE FREQ</h4>
+    <div class="rail-row"><span class="idx">01</span><span class="code">LK-R3</span><span class="v">SP1-7</span></div>
+    <div class="rail-row"><span class="idx">02</span><span class="code">ARRAY</span><span class="v">2</span></div>
+    <div class="rail-row"><span class="idx">03</span><span class="code">MOD</span><span class="v">4.50</span></div>
+    <div class="rail-row"><span class="idx">04</span><span class="code">PHASE</span><span class="v">+5.51</span></div>
+    <div class="rail-row live"><span class="idx">05</span><span class="code">GAIN</span><span class="v">+8.29</span></div>
+    <div class="rail-row"><span class="idx">06</span><span class="code">LATCH</span><span class="v">HOLD</span></div>
+    <div class="rail-row"><span class="idx">07</span><span class="code">R1-DB</span><span class="v">OK</span></div>
+    <div class="rail-row"><span class="idx">08</span><span class="code">R2-DB</span><span class="v">OK</span></div>
+    <div class="rail-row"><span class="idx">09</span><span class="code">R3-DB</span><span class="v">OK</span></div>
+    <div class="rail-row"><span class="idx">10</span><span class="code">R4-DB</span><span class="v">OK</span></div>
+  </div>
+  <div class="rail-section">
+    <h4>FREQ TRACE</h4>
+    <div class="rail-row"><span class="idx">11</span><span class="code">FREQ</span><span class="v">80.408</span></div>
+    <div class="rail-row"><span class="idx">12</span><span class="code">FREQ</span><span class="v">85.408</span></div>
+    <div class="rail-row"><span class="idx">13</span><span class="code">FREQ</span><span class="v">102.948</span></div>
+    <div class="rail-row"><span class="idx">14</span><span class="code">FREQ</span><span class="v">578.702</span></div>
+    <div class="rail-row"><span class="idx">15</span><span class="code">FREQ</span><span class="v">1296.762</span></div>
+    <div class="rail-row"><span class="idx">16</span><span class="code">FREQ</span><span class="v">2104.5</span></div>
+    <div class="rail-row"><span class="idx">17</span><span class="code">FREQ</span><span class="v">4480.8</span></div>
+    <div class="rail-row"><span class="idx">18</span><span class="code">FREQ</span><span class="v">6422.9</span></div>
+  </div>
+  <div class="rail-radar">
+    <span class="sweep"></span>
+    <span class="blip" style="top: 38%; left: 56%;"></span>
+    <span class="blip" style="top: 62%; left: 41%;"></span>
+    <span class="blip" style="top: 28%; left: 70%;"></span>
+  </div>
+</aside>
+
+<!-- RIGHT RAIL (4K only — decorative activity log) -->
+<aside class="rail rail-right">
+  <div class="rail-section rail-log">
+    <h4>NET · ACTIVITY</h4>
+    <div class="log-line lk"><span class="ts">20:43:18</span>LNK ESTAB 192.168.1.4:443</div>
+    <div class="log-line"><span class="ts">20:43:17</span>BUS GAIN +8.29</div>
+    <div class="log-line lk"><span class="ts">20:43:15</span>LK-R3 NODE READY</div>
+    <div class="log-line"><span class="ts">20:43:14</span>BVA PHASE LOCK</div>
+    <div class="log-line"><span class="ts">20:43:12</span>OUTBOUND 10.0.0.1:8080</div>
+    <div class="log-line"><span class="ts">20:43:09</span>FRD DRIFT NIL</div>
+    <div class="log-line"><span class="ts">20:43:08</span>R2 DB QUERY OK</div>
+    <div class="log-line warn"><span class="ts">20:43:05</span>FREQ ANALYSIS HOLD</div>
+    <div class="log-line lk"><span class="ts">20:43:02</span>CLAUDE: API healthy</div>
+    <div class="log-line"><span class="ts">20:42:58</span>PHASE +27.8°</div>
+    <div class="log-line"><span class="ts">20:42:55</span>OUTPUT BUS A LIVE</div>
+    <div class="log-line"><span class="ts">20:42:51</span>INBOUND 198.51.100.4:8443</div>
+    <div class="log-line"><span class="ts">20:42:48</span>LATCH HOLD CONFIRM</div>
+    <div class="log-line"><span class="ts">20:42:45</span>AES KEY EXCHANGE</div>
+    <div class="log-line"><span class="ts">20:42:42</span>R4 DB SYNC OK</div>
+  </div>
+  <div class="rail-section">
+    <h4>BUS · STATUS</h4>
+    <div class="rail-row"><span class="code">BUS A</span><span class="v">7A</span></div>
+    <div class="rail-row live"><span class="code">GAIN</span><span class="v">+8.29</span></div>
+    <div class="rail-row"><span class="code">PHASE</span><span class="v">+27.8°</span></div>
+    <div class="rail-row"><span class="code">LOCK</span><span class="v">LK-R3</span></div>
+    <div class="rail-row"><span class="code">FILTER</span><span class="v">FULL</span></div>
+    <div class="rail-row"><span class="code">DRIFT</span><span class="v">NIL</span></div>
+  </div>
+</aside>
 
 <div class="layout">
   <!-- HEADER -->
