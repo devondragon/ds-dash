@@ -21,9 +21,19 @@ poll_seconds = 180
 
 # Future providers (commented out for now — wire up as we add them):
 
-# [linear]
+# Linear — repeat one [[linear]] block per workspace. You can have N workspaces;
+# each gets its own panel labeled with the `label` value. Get a personal API key
+# at: Linear → Settings → API → Create Personal API Key
+#
+# [[linear]]
+# label = "WORK"             # short, all-caps; shown as "LINEAR · WORK" panel title
 # api_key = "lin_api_..."
-# poll_seconds = 60
+# poll_seconds = 90          # default 90; minimum enforced at 60
+#
+# [[linear]]
+# label = "PERSONAL"
+# api_key = "lin_api_..."
+# poll_seconds = 90
 
 [motion]
 # Get a personal API key at: Motion -> Settings -> API & Integrations
