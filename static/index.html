@@ -528,6 +528,37 @@
     padding: 0 2px;
   }
 
+  /* Inline sparkline in header (visible at every breakpoint except very narrow) */
+  .sys-spark-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .sys-spark {
+    width: 64px;
+    height: 12px;
+    display: block;
+  }
+  .sys-spark .spark-up {
+    fill: none;
+    stroke: var(--amber);
+    stroke-width: 1.2;
+    vector-effect: non-scaling-stroke;
+    filter: drop-shadow(0 0 2px rgba(255, 170, 68, 0.45));
+  }
+  .sys-spark .spark-down {
+    fill: none;
+    stroke: var(--cyan);
+    stroke-width: 1.2;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* rail row state colors (real-bound values) */
+  .rail-row .v.state-ok { color: var(--cyan); }
+  .rail-row .v.state-warn { color: var(--amber); }
+  .rail-row .v.state-alert { color: var(--magenta); }
+  .rail-row .v.state-dim { color: var(--primary-deep); }
+
   /* faint ASCII radar arcs as background flavor in the rail */
   .rail-radar {
     height: 200px;
@@ -634,7 +665,7 @@
     .grid { grid-template-columns: 1fr; }
     .grid > .col:nth-child(3) { flex-direction: column; }
     #panel-sessions { display: none; }
-    #weather, .hdr .right .sys { display: none; }
+    #weather, .hdr .right .sys, .sys-spark-wrap { display: none; }
     .hdr { font-size: 9px; padding: 6px 10px; }
     .hdr .center { font-size: 20px; }
     .ticker { font-size: 10px; }
@@ -649,15 +680,15 @@
   <div class="rail-section">
     <h4>TRACE FREQ</h4>
     <div class="rail-row"><span class="idx">01</span><span class="code">LK-R3</span><span class="v">SP1-7</span></div>
-    <div class="rail-row"><span class="idx">02</span><span class="code">ARRAY</span><span class="v">2</span></div>
+    <div class="rail-row" data-real="cc-live"><span class="idx">02</span><span class="code">ARRAY</span><span class="v">--</span></div>
     <div class="rail-row"><span class="idx">03</span><span class="code">MOD</span><span class="v">4.50</span></div>
     <div class="rail-row"><span class="idx">04</span><span class="code">PHASE</span><span class="v">+5.51</span></div>
-    <div class="rail-row live"><span class="idx">05</span><span class="code">GAIN</span><span class="v">+8.29</span></div>
+    <div class="rail-row" data-real="cpu"><span class="idx">05</span><span class="code">GAIN</span><span class="v state-warn">+--.-</span></div>
     <div class="rail-row"><span class="idx">06</span><span class="code">LATCH</span><span class="v">HOLD</span></div>
-    <div class="rail-row"><span class="idx">07</span><span class="code">R1-DB</span><span class="v">OK</span></div>
-    <div class="rail-row"><span class="idx">08</span><span class="code">R2-DB</span><span class="v">OK</span></div>
-    <div class="rail-row"><span class="idx">09</span><span class="code">R3-DB</span><span class="v">OK</span></div>
-    <div class="rail-row"><span class="idx">10</span><span class="code">R4-DB</span><span class="v">OK</span></div>
+    <div class="rail-row" data-service="anthropic"><span class="idx">07</span><span class="code">R1-DB</span><span class="v state-dim">UNK</span></div>
+    <div class="rail-row" data-service="openai"><span class="idx">08</span><span class="code">R2-DB</span><span class="v state-dim">UNK</span></div>
+    <div class="rail-row" data-service="github"><span class="idx">09</span><span class="code">R3-DB</span><span class="v state-dim">UNK</span></div>
+    <div class="rail-row" data-service="linear"><span class="idx">10</span><span class="code">R4-DB</span><span class="v state-dim">UNK</span></div>
   </div>
   <div class="rail-section">
     <h4>FREQ TRACE</h4>
@@ -717,6 +748,13 @@
     <div class="center" id="clock">--:--:--</div>
     <div class="right">
       <span class="sys" id="syschip">CPU --% · MEM --% · UP --</span>
+      <span class="sys-spark-wrap">
+        <span class="dim">NET</span>
+        <svg class="sys-spark" viewBox="0 0 60 12" preserveAspectRatio="none">
+          <path id="spark-down" class="spark-down" d="" />
+          <path id="spark-up" class="spark-up" d="" />
+        </svg>
+      </span>
       <span id="weather">62°F · SF</span>
     </div>
   </div>
@@ -1049,8 +1087,42 @@ function renderHeatmap(p) {
   `);
 }
 
+function tracePath(hist, key, W, H, maxVal) {
+  const n = hist.length;
+  if (n < 2) return '';
+  const pad = Math.min(2, H * 0.1);
+  return hist.map((s, i) => {
+    const x = (i / (n - 1)) * W;
+    const y = H - (s[key] / maxVal) * (H - pad * 2) - pad;
+    return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+  }).join(' ');
+}
+
+function updateNetTraces(hist) {
+  // Updates both the right-rail oscilloscope (240x80) and the header sparkline (60x12).
+  const targets = [
+    ['net-trace-up',   'up',   240, 80],
+    ['net-trace-down', 'down', 240, 80],
+    ['spark-up',       'up',   60,  12],
+    ['spark-down',     'down', 60,  12],
+  ];
+  if (hist.length < 2) {
+    targets.forEach(([id]) => { const e = el(id); if (e) e.setAttribute('d', ''); });
+    const peakEl = el('trace-peak');
+    if (peakEl) peakEl.textContent = 'peak --.-';
+    return;
+  }
+  const maxVal = Math.max(0.1, ...hist.flatMap(s => [s.up, s.down]));
+  targets.forEach(([id, key, W, H]) => {
+    const e = el(id);
+    if (e) e.setAttribute('d', tracePath(hist, key, W, H, maxVal));
+  });
+  const peakEl = el('trace-peak');
+  if (peakEl) peakEl.textContent = 'peak ' + maxVal.toFixed(1);
+}
+
 function renderRail(sys) {
-  // Right rail — real numbers from psutil. Cheap to update even when rail is display:none.
+  // Right rail + header sparkline — both fed from sys.net_history.
   if (!sys || sys.status === 'pending') return;
 
   const upEl = el('net-up');
@@ -1058,28 +1130,7 @@ function renderRail(sys) {
   if (upEl) upEl.textContent = (sys.net_up_mbps ?? 0).toFixed(1);
   if (downEl) downEl.textContent = (sys.net_down_mbps ?? 0).toFixed(1);
 
-  const hist = sys.net_history || [];
-  const pUp = el('net-trace-up');
-  const pDown = el('net-trace-down');
-  const peakEl = el('trace-peak');
-  if (pUp && pDown) {
-    if (hist.length < 2) {
-      pUp.setAttribute('d', '');
-      pDown.setAttribute('d', '');
-      if (peakEl) peakEl.textContent = 'peak --.-';
-    } else {
-      const maxVal = Math.max(0.1, ...hist.flatMap(s => [s.up, s.down]));
-      const W = 240, H = 80, n = hist.length;
-      const path = (key) => hist.map((s, i) => {
-        const x = (i / (n - 1)) * W;
-        const y = H - (s[key] / maxVal) * (H - 4) - 2;
-        return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
-      }).join(' ');
-      pUp.setAttribute('d', path('up'));
-      pDown.setAttribute('d', path('down'));
-      if (peakEl) peakEl.textContent = 'peak ' + maxVal.toFixed(1);
-    }
-  }
+  updateNetTraces(sys.net_history || []);
 
   const bus = {
     cpu:    (sys.cpu_percent ?? 0) + '%',
@@ -1093,6 +1144,46 @@ function renderRail(sys) {
     const v = row.querySelector('.v');
     if (v) v.textContent = bus[row.dataset.bus] ?? '—';
   });
+}
+
+// Map service-status indicator -> {3-letter code, state class}.
+const SERVICE_STATE = {
+  none:     { code: 'OK',  cls: 'state-ok' },
+  minor:    { code: 'MIN', cls: 'state-warn' },
+  major:    { code: 'MAJ', cls: 'state-alert' },
+  critical: { code: 'CRIT', cls: 'state-alert' },
+  unknown:  { code: 'UNK', cls: 'state-dim' },
+};
+
+function setRailValue(selector, text, stateCls) {
+  const el = document.querySelector(selector + ' .v');
+  if (!el) return;
+  el.textContent = text;
+  if (stateCls) {
+    el.classList.remove('state-ok', 'state-warn', 'state-alert', 'state-dim');
+    el.classList.add(stateCls);
+  }
+}
+
+function renderLeftRail(providers) {
+  // Bind a handful of left-rail TRACE FREQ rows to real provider state.
+  // The rest stay decorative — pure FUI flourish.
+  const sys = providers.system;
+  if (sys && sys.status === 'ok') {
+    const cpu = sys.cpu_percent ?? 0;
+    setRailValue('.rail-left [data-real="cpu"]', '+' + cpu.toFixed(1), 'state-warn');
+  }
+  const cl = providers.claude;
+  if (cl && cl.cc_sessions) {
+    setRailValue('.rail-left [data-real="cc-live"]', String(cl.cc_sessions.live ?? 0), 'state-ok');
+  }
+  const svc = providers.services;
+  if (svc && svc.items) {
+    for (const [name, info] of Object.entries(svc.items)) {
+      const state = SERVICE_STATE[info.indicator] || SERVICE_STATE.unknown;
+      setRailValue(`.rail-left [data-service="${name}"]`, state.code, state.cls);
+    }
+  }
 }
 
 function shortenUptime(s) {
@@ -1149,6 +1240,7 @@ async function poll() {
     renderHeatmap(p.github);
     renderSystem(p.system);
     renderRail(p.system);
+    renderLeftRail(p);
 
     if ((s.ticker || []).length !== lastTickerLen) {
       renderTicker(s.ticker || []);
