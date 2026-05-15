@@ -283,7 +283,7 @@ for cinematic density.
 
 ## Current provider state
 
-All seven panels are real:
+All eight panels are real:
 
 | panel         | source                                                                    |
 |---------------|---------------------------------------------------------------------------|
