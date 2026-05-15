@@ -1033,20 +1033,32 @@ async def lifespan(_app: FastAPI):
             "message": "Add [motion] api_key to ~/.cowork-dash/config.toml",
         }
 
-    # Temporary single-workspace wiring — Task 5 replaces this with
-    # multi-workspace iteration. Reads first [[linear]] block only.
     lin_blocks = cfg.get("linear") or []
-    if lin_blocks:
-        first = lin_blocks[0]
-        if first.get("label") and first.get("api_key"):
-            label = first["label"]
-            STATE["providers"]["linear"][label] = {"status": "pending"}
-            BACKGROUND_TASKS.append(asyncio.create_task(linear_poll(
-                label, first["api_key"],
-                max(_LINEAR_MIN_INTERVAL, first.get("poll_seconds", _LINEAR_DEFAULT_INTERVAL)),
-            )))
-            _push_ticker("daemon", f"linear provider online ({label})", "info")
-    if not STATE["providers"]["linear"]:
+    if not isinstance(lin_blocks, list):
+        print("[cowork-dash] [linear] in config.toml must be an array of tables ([[linear]])", file=sys.stderr)
+        lin_blocks = []
+    seen_labels: set[str] = set()
+    started_any = False
+    for idx, block in enumerate(lin_blocks):
+        if not isinstance(block, dict):
+            print(f"[cowork-dash] [[linear]] entry #{idx} is not a table — skipping", file=sys.stderr)
+            continue
+        label = block.get("label")
+        api_key = block.get("api_key")
+        if not label or not api_key:
+            print(f"[cowork-dash] [[linear]] entry #{idx} missing label or api_key — skipping", file=sys.stderr)
+            continue
+        if label in seen_labels:
+            print(f"[cowork-dash] [[linear]] duplicate label '{label}' — keeping the first, skipping later", file=sys.stderr)
+            continue
+        seen_labels.add(label)
+        STATE["providers"]["linear"][label] = {"status": "pending"}
+        interval = max(_LINEAR_MIN_INTERVAL, block.get("poll_seconds", _LINEAR_DEFAULT_INTERVAL))
+        BACKGROUND_TASKS.append(asyncio.create_task(linear_poll(label, api_key, interval)))
+        _push_ticker("daemon", f"linear provider online ({label})", "info")
+        started_any = True
+
+    if not started_any:
         STATE["providers"]["linear"] = {
             "status": "unconfigured",
             "message": "Add [[linear]] blocks to ~/.cowork-dash/config.toml",
