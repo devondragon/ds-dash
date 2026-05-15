@@ -644,6 +644,9 @@ async def linear_poll(label: str, api_key: str, interval: int) -> None:
         "Content-Type": "application/json",
         "User-Agent": "cowork-dash/0.1",
     }
+    prev_ids: set[str] = set()
+    prev_states: dict[str, str] = {}   # id -> state_name
+    first_poll = True
     while True:
         try:
             async with httpx.AsyncClient(timeout=20, headers=headers) as c:
@@ -662,6 +665,38 @@ async def linear_poll(label: str, api_key: str, interval: int) -> None:
             cycle_nodes = ((data.get("cycles") or {}).get("nodes")) or []
 
             shaped_all = [_linear_to_item(n) for n in raw_nodes]
+            cur_ids = {it["id"] for it in shaped_all if it["id"]}
+            cur_states = {it["id"]: it["state_name"] for it in shaped_all if it["id"]}
+
+            if not first_poll:
+                for it in shaped_all:
+                    if it["id"] and it["id"] not in prev_ids:
+                        text = f"{label} · NEW: {it['identifier']} {it['title']}"[:140]
+                        _push_ticker(f"linear-{label}", text, "info")
+                for it in shaped_all:
+                    iid = it["id"]
+                    if not iid or iid not in prev_ids:
+                        continue
+                    new_name = it["state_name"]
+                    old_name = prev_states.get(iid, "")
+                    if new_name == old_name:
+                        continue
+                    if it["state_type"] == "completed":
+                        _push_ticker(
+                            f"linear-{label}",
+                            f"{label} · {it['identifier']} ✓ DONE",
+                            "info",
+                        )
+                    elif it["state_type"] == "started" and "review" in new_name.lower():
+                        _push_ticker(
+                            f"linear-{label}",
+                            f"{label} · {it['identifier']} → IN REVIEW",
+                            "info",
+                        )
+
+            prev_ids = cur_ids
+            prev_states = cur_states
+            first_poll = False
             visible = [
                 it for it in shaped_all
                 if it["state_type"] not in ("completed", "canceled")
