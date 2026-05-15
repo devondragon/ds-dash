@@ -14,6 +14,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import re
+import shutil
 import socket
 import sys
 import time
@@ -207,22 +209,163 @@ def _repo_short(repo_url: str) -> str:
 # Mock providers (replace one at a time as we add real ones)
 # --------------------------------------------------------------------------- #
 
-async def mock_calendar_poll() -> None:
-    """Mocked calendar data until we wire up ical-buddy."""
+# --------------------------------------------------------------------------- #
+# Calendar provider (real — shells out to ical-buddy on macOS)
+# --------------------------------------------------------------------------- #
+
+_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+_TIME_RE = re.compile(r"\d{2}:\d{2}")
+_MAX_EVENTS = 10  # cap what we send to the frontend
+
+
+def _find_ical_buddy() -> str | None:
+    """Locate a runnable icalBuddy binary. Prefer Homebrew paths; fall back to PATH."""
+    for candidate in ("/opt/homebrew/bin/icalBuddy", "/usr/local/bin/icalBuddy"):
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return shutil.which("icalBuddy")
+
+
+def _parse_ical_buddy(output: str) -> list[dict]:
+    """Parse ical-buddy's line-based output into structured events.
+
+    Output (with -po 'title,datetime' -nrd -tf %H:%M -df %Y-%m-%d -b ''):
+        Event title
+            2026-05-15 at 14:30 - 15:00         # timed, same day
+            2026-05-15                          # all-day
+            2026-05-15 at 09:00 - 2026-05-17 at 17:00   # multi-day timed
+
+    Title lines start at column 0; date lines are indented. We don't trust any
+    particular keyword (e.g. "at"); we just pull YYYY-MM-DD and HH:MM tokens
+    out of the indented lines.
+    """
+    events: list[dict] = []
+    current_title: str | None = None
+    for line in output.splitlines():
+        if not line.strip():
+            continue
+        if line.startswith((" ", "\t")):
+            if not current_title:
+                continue
+            dates = _DATE_RE.findall(line)
+            times = _TIME_RE.findall(line)
+            if not dates:
+                continue
+            start_date = dates[0]
+            end_date = dates[1] if len(dates) > 1 else start_date
+            start_time = times[0] if times else None
+            end_time = times[1] if len(times) > 1 else None
+            events.append({
+                "title": current_title,
+                "start_date": start_date,
+                "end_date": end_date,
+                "start_time": start_time,
+                "end_time": end_time,
+                "is_all_day": start_time is None,
+                "start": start_time or "ALL",
+                "is_now": False,
+                "is_next": False,
+            })
+            current_title = None
+        else:
+            current_title = line.lstrip("•·*- \t").strip() or None
+    return events
+
+
+def _annotate_now_next(events: list[dict]) -> None:
+    """Set is_now and is_next flags based on current local time."""
+    now = datetime.now()
+
+    def parse_dt(date_str: str, time_str: str | None) -> datetime | None:
+        if not time_str:
+            return None
+        try:
+            return datetime.fromisoformat(f"{date_str}T{time_str}")
+        except ValueError:
+            return None
+
+    for ev in events:
+        if ev["is_all_day"]:
+            continue
+        start_dt = parse_dt(ev["start_date"], ev["start_time"])
+        end_dt = parse_dt(ev["end_date"], ev["end_time"])
+        if start_dt and end_dt and start_dt <= now < end_dt:
+            ev["is_now"] = True
+
+    upcoming = []
+    for ev in events:
+        if ev["is_now"] or ev["is_all_day"]:
+            continue
+        start_dt = parse_dt(ev["start_date"], ev["start_time"])
+        if start_dt and start_dt > now:
+            upcoming.append((start_dt, ev))
+    if upcoming:
+        upcoming.sort(key=lambda x: x[0])
+        upcoming[0][1]["is_next"] = True
+
+
+async def calendar_poll(ical_buddy: str, look_ahead_days: int = 1, interval: int = 60) -> None:
+    """Poll macOS Calendar via ical-buddy. Uses argv (no shell) — args are
+    trusted (path from config or auto-detect; rest are static flags)."""
+    window = "eventsToday" if look_ahead_days <= 0 else f"eventsToday+{look_ahead_days}"
+    args = [
+        ical_buddy,
+        "-nc",
+        "-nrd",
+        "-iep", "title,datetime",
+        "-po",  "title,datetime",
+        "-b",   "",
+        "-tf",  "%H:%M",
+        "-df",  "%Y-%m-%d",
+        window,
+    ]
     while True:
-        now = datetime.now()
-        STATE["providers"]["calendar"] = {
-            "status": "mocked",
-            "updated_at": _now_iso(),
-            "events": [
-                {"start": (now + timedelta(minutes=12)).strftime("%H:%M"), "title": "Eng standup", "is_now": False, "is_next": True},
-                {"start": (now + timedelta(hours=1)).strftime("%H:%M"), "title": "1:1 w/ Sarah", "is_now": False, "is_next": False},
-                {"start": (now + timedelta(hours=2)).strftime("%H:%M"), "title": "Design review", "is_now": False, "is_next": False},
-                {"start": (now + timedelta(hours=3, minutes=30)).strftime("%H:%M"), "title": "Deep work block", "is_now": False, "is_next": False},
-                {"start": (now + timedelta(hours=5)).strftime("%H:%M"), "title": "Dinner w/ Mona", "is_now": False, "is_next": False},
-            ],
-        }
-        await asyncio.sleep(60)
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
+            if proc.returncode != 0:
+                STATE["providers"]["calendar"] = {
+                    "status": "error",
+                    "error": stderr.decode("utf-8", errors="replace").strip()[:200] or f"ical-buddy exit {proc.returncode}",
+                    "updated_at": _now_iso(),
+                }
+            else:
+                events = _parse_ical_buddy(stdout.decode("utf-8", errors="replace"))
+                _annotate_now_next(events)
+                STATE["providers"]["calendar"] = {
+                    "status": "ok",
+                    "updated_at": _now_iso(),
+                    "events": events[:_MAX_EVENTS],
+                }
+        except FileNotFoundError:
+            STATE["providers"]["calendar"] = {
+                "status": "unconfigured",
+                "message": f"ical-buddy not found at {ical_buddy}. Install: brew install ical-buddy",
+            }
+            return
+        except OSError as e:
+            STATE["providers"]["calendar"] = {
+                "status": "unconfigured",
+                "message": f"ical-buddy at {ical_buddy} can't exec ({e}). Reinstall: brew install ical-buddy",
+            }
+            return
+        except asyncio.TimeoutError:
+            STATE["providers"]["calendar"] = {
+                "status": "error",
+                "error": "ical-buddy timed out after 10s",
+                "updated_at": _now_iso(),
+            }
+        except Exception as e:
+            STATE["providers"]["calendar"] = {
+                "status": "error",
+                "error": f"{type(e).__name__}: {e}",
+                "updated_at": _now_iso(),
+            }
+        await asyncio.sleep(interval)
 
 
 async def mock_tasks_poll() -> None:
@@ -374,8 +517,21 @@ async def lifespan(_app: FastAPI):
             "message": "Add [github] token and username to ~/.cowork-dash/config.toml",
         }
 
-    # Always start the mocks and the services poller.
-    BACKGROUND_TASKS.append(asyncio.create_task(mock_calendar_poll()))
+    cal = cfg.get("calendar") or {}
+    ical_buddy = cal.get("ical_buddy_path") or _find_ical_buddy()
+    if ical_buddy and os.path.isfile(ical_buddy):
+        BACKGROUND_TASKS.append(asyncio.create_task(calendar_poll(
+            ical_buddy,
+            look_ahead_days=cal.get("look_ahead_days", 1),
+            interval=cal.get("poll_seconds", 60),
+        )))
+        _push_ticker("daemon", "calendar provider online", "info")
+    else:
+        STATE["providers"]["calendar"] = {
+            "status": "unconfigured",
+            "message": "Install ical-buddy (brew install ical-buddy) or set [calendar].ical_buddy_path",
+        }
+
     BACKGROUND_TASKS.append(asyncio.create_task(mock_tasks_poll()))
     BACKGROUND_TASKS.append(asyncio.create_task(mock_claude_poll()))
     sysc = cfg.get("system") or {}

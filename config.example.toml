@@ -30,10 +30,12 @@ poll_seconds = 180
 # workspace_id = "..."
 # poll_seconds = 60
 
-# [calendar]
-# # Path to ical-buddy binary. Install with: brew install ical-buddy
-# ical_buddy = "/opt/homebrew/bin/icalBuddy"
-# look_ahead_days = 2
+[calendar]
+# Path to ical-buddy. Auto-detected at /opt/homebrew/bin/icalBuddy or via PATH
+# if omitted. Install with: brew install ical-buddy
+# ical_buddy_path = "/opt/homebrew/bin/icalBuddy"
+look_ahead_days = 1
+poll_seconds = 60
 
 # [gmail]
 # # OAuth credentials path (Google Cloud project)
