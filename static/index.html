@@ -1017,6 +1017,118 @@ function renderTasks(p) {
   setHtml('tasks-body', rows);
 }
 
+function _safeId(s) {
+  return String(s).replace(/[^A-Za-z0-9_-]/g, '_');
+}
+
+function _ensureLinearPanel(label) {
+  const safe = _safeId(label);
+  const panelId = 'panel-linear-' + safe;
+  if (el(panelId)) return safe;
+
+  const panel = document.createElement('div');
+  panel.className = 'panel grow';
+  panel.id = panelId;
+
+  const title = document.createElement('div');
+  title.className = 'panel-title';
+  const ttl = document.createElement('span');
+  ttl.className = 'ttl';
+  ttl.textContent = 'LINEAR · ' + label;
+  const meta = document.createElement('span');
+  meta.className = 'meta';
+  meta.id = 'linear-meta-' + safe;
+  meta.textContent = '—';
+  title.appendChild(ttl);
+  title.appendChild(meta);
+
+  const body = document.createElement('div');
+  body.id = 'linear-body-' + safe;
+  body.className = 'dim';
+  body.textContent = 'Loading…';
+
+  panel.appendChild(title);
+  panel.appendChild(body);
+  el('linear-panels').appendChild(panel);
+  return safe;
+}
+
+function _ensureUnconfiguredPanel(message) {
+  const container = el('linear-panels');
+  Array.from(container.children).forEach(child => {
+    if (child.id && child.id.startsWith('panel-linear-') && child.id !== 'panel-linear-unconfigured') {
+      child.remove();
+    }
+  });
+  let panel = el('panel-linear-unconfigured');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.className = 'panel grow';
+    panel.id = 'panel-linear-unconfigured';
+    const title = document.createElement('div');
+    title.className = 'panel-title';
+    const ttl = document.createElement('span');
+    ttl.className = 'ttl';
+    ttl.textContent = 'LINEAR';
+    const meta = document.createElement('span');
+    meta.className = 'meta';
+    meta.textContent = 'OFFLINE';
+    title.appendChild(ttl);
+    title.appendChild(meta);
+    const body = document.createElement('div');
+    body.id = 'linear-unconfigured-body';
+    body.className = 'dim';
+    panel.appendChild(title);
+    panel.appendChild(body);
+    container.appendChild(panel);
+  }
+  el('linear-unconfigured-body').textContent = message || 'unconfigured';
+}
+
+function renderLinear(state) {
+  const container = el('linear-panels');
+  if (!container) return;
+
+  if (state && state.status === 'unconfigured') {
+    _ensureUnconfiguredPanel(state.message || '');
+    return;
+  }
+
+  if (!state || typeof state !== 'object') {
+    Array.from(container.children).forEach(c => c.remove());
+    return;
+  }
+
+  const labels = Object.keys(state).filter(k => k !== 'status' && k !== 'message');
+  const wantedIds = new Set(labels.map(l => 'panel-linear-' + _safeId(l)));
+
+  const placeholder = el('panel-linear-unconfigured');
+  if (placeholder) placeholder.remove();
+
+  Array.from(container.children).forEach(child => {
+    if (child.id && child.id.startsWith('panel-linear-') && !wantedIds.has(child.id)) {
+      child.remove();
+    }
+  });
+
+  labels.forEach(label => {
+    const safe = _ensureLinearPanel(label);
+    renderLinearPanel(label, safe, state[label]);
+  });
+}
+
+function renderLinearPanel(label, safe, p) {
+  const metaId = 'linear-meta-' + safe;
+  const bodyId = 'linear-body-' + safe;
+  if (!el(bodyId)) return;
+  setMeta(metaId, p);
+  if (!p || p.status === 'pending') {
+    setHtml(bodyId, '<div class="dim">loading…</div>');
+    return;
+  }
+  setHtml(bodyId, '<div class="dim">stub — workspace=' + escapeHtml(label) + ' status=' + escapeHtml(p.status||'?') + '</div>');
+}
+
 function renderGithub(p) {
   setMeta('github-meta', p);
   if (!p) { setHtml('github-body', '<div class="dim">loading…</div>'); return; }
@@ -1242,6 +1354,7 @@ async function poll() {
     renderSessions(p.claude);
     renderCalendar(p.calendar);
     renderTasks(p.tasks);
+    renderLinear(p.linear);
     renderGithub(p.github);
     renderHeatmap(p.github);
     renderSystem(p.system);
