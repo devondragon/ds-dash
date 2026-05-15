@@ -543,7 +543,6 @@ query DashboardSnapshot {
         url
         state { name type }
         team { key }
-
       }
     }
   }
