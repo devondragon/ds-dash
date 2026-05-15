@@ -1,0 +1,48 @@
+# cowork-dash configuration
+# Copy this file to ~/.cowork-dash/config.toml and fill in your values.
+
+[server]
+# Port the daemon listens on. Open http://localhost:PORT in any browser tab.
+port = 7766
+
+[github]
+# Create a fine-grained personal access token at:
+#   https://github.com/settings/tokens?type=beta
+# Required scopes (read-only):
+#   - "Issues" (read)
+#   - "Pull requests" (read)
+#   - "Metadata" (read, implicit)
+# For private repo activity in the heatmap, also grant "Contents (read)".
+token = "ghp_replace_me"
+username = "your_github_login"
+# Poll interval in seconds. GitHub allows 5000 req/hr for authenticated users,
+# so 180s here is conservative and uses well under 100 req/hr.
+poll_seconds = 180
+
+# Future providers (commented out for now — wire up as we add them):
+
+# [linear]
+# api_key = "lin_api_..."
+# poll_seconds = 60
+
+# [motion]
+# api_key = "..."
+# workspace_id = "..."
+# poll_seconds = 60
+
+# [calendar]
+# # Path to ical-buddy binary. Install with: brew install ical-buddy
+# ical_buddy = "/opt/homebrew/bin/icalBuddy"
+# look_ahead_days = 2
+
+# [gmail]
+# # OAuth credentials path (Google Cloud project)
+# credentials = "~/.cowork-dash/gmail-credentials.json"
+# token = "~/.cowork-dash/gmail-token.json"
+
+# [system]
+# poll_seconds = 5
+
+# [claude_code]
+# # Directory to scan for active CC sessions
+# sessions_dir = "~/Library/Application Support/Claude/local-agent-mode-sessions"

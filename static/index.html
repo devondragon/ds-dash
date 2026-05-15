@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>COWORK://DASHBOARD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050a05;
+    --bg-panel: rgba(0, 40, 20, 0.22);
+    --border: #00cc44;
+    --primary: #00ff66;
+    --primary-dim: #00aa44;
+    --primary-deep: #007733;
+    --primary-deeper: #004422;
+    --accent: #00ccff;
+    --warn: #ffaa00;
+    --alert: #ff3344;
+    --header-amber: #ffaa00;
+    --vt: 'VT323', monospace;
+    --mono: 'Share Tech Mono', 'Courier New', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--primary);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.45;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  body {
+    padding: 14px;
+    position: relative;
+  }
+
+  /* Scanlines */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 255, 102, 0.035) 0px,
+      rgba(0, 255, 102, 0.035) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    z-index: 100;
+  }
+
+  /* CRT vignette */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center,
+      transparent 35%,
+      rgba(0,0,0,0.45) 100%);
+    z-index: 101;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 8px;
+    height: 100%;
+  }
+
+  /* ---------- header strip ---------- */
+  .hdr {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    background: rgba(0, 255, 102, 0.04);
+    font-family: var(--vt);
+    font-size: 18px;
+    letter-spacing: 1px;
+  }
+  .hdr .left { color: #00ff99; }
+  .hdr .center { color: var(--primary); text-align: center; }
+  .hdr .right { color: var(--header-amber); text-align: right; }
+  .hdr .right .sys { font-size: 13px; font-family: var(--mono); color: var(--primary-dim); margin-right: 16px; }
+
+  .badge {
+    display: inline-block;
+    padding: 0 6px;
+    border: 1px solid currentColor;
+    margin-right: 6px;
+    font-size: 12px;
+  }
+  .badge.live { color: var(--primary); }
+  .badge.live::before { content: '● '; animation: pulse 1.5s infinite; }
+  @keyframes pulse {
+    0%, 60% { opacity: 1; }
+    61%, 100% { opacity: 0.25; }
+  }
+
+  /* ---------- main grid ---------- */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1.25fr 1fr;
+    gap: 8px;
+    min-height: 0;
+  }
+
+  .col { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+
+  .panel {
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    padding: 8px 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .panel.grow { flex: 1; }
+
+  .panel-title {
+    color: var(--accent);
+    font-size: 11px;
+    letter-spacing: 2px;
+    margin-bottom: 7px;
+    border-bottom: 1px dashed var(--primary-deep);
+    padding-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .panel-title .ttl::before { content: '▌ '; }
+  .panel-title .meta { color: var(--primary-deep); font-size: 11px; }
+  .panel-title .meta.mocked { color: var(--warn); }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 3px 0;
+  }
+  .row .label { color: var(--primary-dim); }
+  .row .val { color: var(--primary); }
+
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 3px 0;
+    font-family: var(--mono);
+  }
+  .bar .blab { width: 40px; color: var(--primary-dim); font-size: 11px; }
+  .bar .btrack { flex: 1; letter-spacing: -0.5px; color: var(--primary); }
+  .bar .bval { width: 50px; text-align: right; color: var(--primary); font-size: 12px; }
+
+  .ok { color: var(--primary); }
+  .warn { color: var(--warn); }
+  .alert { color: var(--alert); }
+  .dim { color: var(--primary-dim); }
+  .deep { color: var(--primary-deep); }
+  .accent { color: var(--accent); }
+
+  .dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    margin-right: 7px;
+    vertical-align: middle;
+  }
+  .dot.ok { background: var(--primary); box-shadow: 0 0 4px var(--primary); }
+  .dot.warn { background: var(--warn); box-shadow: 0 0 4px var(--warn); }
+  .dot.alert { background: var(--alert); box-shadow: 0 0 4px var(--alert); }
+  .dot.unknown { background: var(--primary-deep); }
+
+  /* Task list */
+  .task {
+    display: grid;
+    grid-template-columns: 14px 32px 1fr auto;
+    gap: 6px;
+    align-items: baseline;
+    margin: 3px 0;
+    font-size: 12px;
+  }
+  .task .pri { color: var(--alert); text-align: center; }
+  .task .src {
+    color: var(--primary-deep);
+    font-size: 10px;
+    border: 1px solid var(--primary-deeper);
+    padding: 0 3px;
+    text-align: center;
+  }
+  .task .title { color: var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .task .due.warn { color: var(--warn); }
+  .task .due.alert { color: var(--alert); }
+
+  /* Calendar */
+  .cal-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+    margin: 3px 0;
+    align-items: baseline;
+  }
+  .cal-row .when { font-family: var(--mono); }
+  .cal-row.now .when { color: var(--warn); }
+  .cal-row.now .what { color: var(--warn); }
+  .cal-row.next .when { color: var(--accent); }
+
+  /* Heatmap */
+  .heatmap {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 3px;
+    margin: 8px 0 4px;
+  }
+  .heatmap .day {
+    aspect-ratio: 1;
+    background: var(--primary-deeper);
+    border: 1px solid transparent;
+  }
+  .heatmap .day.l1 { background: #003319; }
+  .heatmap .day.l2 { background: #006633; }
+  .heatmap .day.l3 { background: #009944; }
+  .heatmap .day.l4 { background: #00cc55; }
+  .heatmap .day.l5 { background: #00ff66; box-shadow: 0 0 4px var(--primary); }
+  .heatmap .day[data-today="1"] { border-color: var(--accent); }
+
+  .heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--primary-deep);
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+  .heatmap-legend .sq {
+    display: inline-block; width: 8px; height: 8px;
+  }
+
+  /* CC sessions blinker */
+  .blink-cursor::after {
+    content: '▎';
+    color: var(--accent);
+    animation: pulse 1.2s infinite;
+    margin-left: 2px;
+  }
+
+  /* Ticker */
+  .ticker {
+    border: 1px solid var(--border);
+    background: rgba(0, 40, 20, 0.3);
+    padding: 5px 12px;
+    font-size: 11px;
+    color: var(--primary-dim);
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+  }
+  .ticker-track {
+    display: inline-block;
+    animation: scroll 60s linear infinite;
+    padding-left: 100%;
+  }
+  .ticker-track:hover { animation-play-state: paused; }
+  @keyframes scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+
+  .ticker-item { margin-right: 32px; }
+  .ticker-item .ts { color: var(--accent); margin-right: 6px; }
+  .ticker-item .src {
+    color: var(--primary-deep);
+    font-size: 10px;
+    margin-right: 4px;
+  }
+  .ticker-item.warn .ts { color: var(--warn); }
+  .ticker-item.alert .ts { color: var(--alert); }
+
+  /* PR list */
+  .pr-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 2px 0;
+    font-size: 11px;
+    overflow: hidden;
+  }
+  .pr-item .pr-title {
+    color: var(--primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+  }
+  .pr-item .pr-repo { color: var(--primary-deep); font-size: 10px; }
+
+  /* Status footer */
+  .panel-foot {
+    color: var(--primary-deeper);
+    font-size: 10px;
+    text-align: right;
+    margin-top: 4px;
+    border-top: 1px dashed var(--primary-deeper);
+    padding-top: 3px;
+  }
+
+  /* Connection state */
+  .offline-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 51, 68, 0.08);
+    z-index: 50;
+    display: none;
+    pointer-events: none;
+  }
+  body.offline .offline-overlay { display: block; }
+  body.offline .hdr .badge.live { color: var(--alert); }
+
+  /* small spark bars (mini activity strips) */
+  .spark {
+    display: inline-flex;
+    align-items: flex-end;
+    height: 12px;
+    gap: 1px;
+    vertical-align: middle;
+    margin-left: 6px;
+  }
+  .spark span {
+    display: inline-block;
+    width: 3px;
+    background: var(--primary-dim);
+  }
+
+  /* error chip */
+  .err {
+    color: var(--alert);
+    font-size: 11px;
+    padding: 2px 6px;
+    border: 1px solid var(--alert);
+    display: inline-block;
+    margin: 4px 0;
+  }
+</style>
+</head>
+<body>
+<div class="offline-overlay"></div>
+
+<div class="layout">
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="left">
+      <span class="badge live" id="connection">ONLINE</span>
+      ▎ COWORK://DASHBOARD ▎ DEVON
+    </div>
+    <div class="center" id="clock">--:--:-- · -- ---</div>
+    <div class="right">
+      <span class="sys" id="syschip">CPU --% · MEM --% · UP --</span>
+      <span id="weather">62°F ☁ SF</span>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="grid">
+
+    <!-- LEFT COL: Services, Claude, CC Sessions -->
+    <div class="col">
+      <div class="panel" id="panel-services">
+        <div class="panel-title">
+          <span class="ttl">SERVICES</span>
+          <span class="meta" id="services-meta">—</span>
+        </div>
+        <div id="services-body" class="dim">Loading…</div>
+      </div>
+
+      <div class="panel" id="panel-claude">
+        <div class="panel-title">
+          <span class="ttl">CLAUDE USAGE</span>
+          <span class="meta" id="claude-meta">—</span>
+        </div>
+        <div id="claude-body" class="dim">Loading…</div>
+      </div>
+
+      <div class="panel grow" id="panel-sessions">
+        <div class="panel-title">
+          <span class="ttl">CC SESSIONS</span>
+          <span class="meta" id="sessions-meta">—</span>
+        </div>
+        <div id="sessions-body" class="dim">Loading…</div>
+      </div>
+    </div>
+
+    <!-- CENTER COL: Calendar, Tasks -->
+    <div class="col">
+      <div class="panel" id="panel-cal">
+        <div class="panel-title">
+          <span class="ttl">CALENDAR · TODAY</span>
+          <span class="meta" id="cal-meta">—</span>
+        </div>
+        <div id="cal-body" class="dim">Loading…</div>
+      </div>
+
+      <div class="panel grow" id="panel-tasks">
+        <div class="panel-title">
+          <span class="ttl">TASKS · ACTIVE</span>
+          <span class="meta" id="tasks-meta">—</span>
+        </div>
+        <div id="tasks-body" class="dim">Loading…</div>
+      </div>
+    </div>
+
+    <!-- RIGHT COL: GitHub, Heatmap -->
+    <div class="col">
+      <div class="panel" id="panel-github">
+        <div class="panel-title">
+          <span class="ttl">GITHUB</span>
+          <span class="meta" id="github-meta">—</span>
+        </div>
+        <div id="github-body" class="dim">Loading…</div>
+      </div>
+
+      <div class="panel grow" id="panel-heatmap">
+        <div class="panel-title">
+          <span class="ttl">CONTRIBUTIONS · 8W</span>
+          <span class="meta" id="heatmap-meta">—</span>
+        </div>
+        <div id="heatmap-body" class="dim">Loading…</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TICKER -->
+  <div class="ticker">
+    <div class="ticker-track" id="ticker-track">
+      <span class="dim">awaiting events…</span>
+    </div>
+  </div>
+</div>
+
+<script>
+//------------------------------------------------------------------
+// Utility helpers
+//------------------------------------------------------------------
+
+function el(id) { return document.getElementById(id); }
+
+function fmtBar(percent, width = 10) {
+  const p = Math.max(0, Math.min(100, percent | 0));
+  const filled = Math.round(p / (100 / width));
+  return '[' + '█'.repeat(filled) + '░'.repeat(width - filled) + ']';
+}
+
+function setText(id, text) {
+  const e = el(id);
+  if (e) e.textContent = text;
+}
+
+function setHtml(id, html) {
+  const e = el(id);
+  if (e) e.innerHTML = html;
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function timeAgo(iso) {
+  if (!iso) return '—';
+  const ms = Date.now() - new Date(iso).getTime();
+  const s = Math.round(ms / 1000);
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.round(s / 60) + 'm';
+  if (s < 86400) return Math.round(s / 3600) + 'h';
+  return Math.round(s / 86400) + 'd';
+}
+
+//------------------------------------------------------------------
+// Clock
+//------------------------------------------------------------------
+
+const DAYS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+function renderClock() {
+  const d = new Date();
+  const t = pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+  const date = DAYS[d.getDay()] + ' ' + pad2(d.getDate()) + '.' + MONTHS[d.getMonth()] + '.' + d.getFullYear();
+  setText('clock', t + ' · ' + date);
+}
+
+//------------------------------------------------------------------
+// Renderers per provider
+//------------------------------------------------------------------
+
+function metaTag(provider) {
+  if (!provider) return { text: '—', mocked: false };
+  if (provider.status === 'mocked') return { text: 'MOCK', mocked: true };
+  if (provider.status === 'unconfigured') return { text: 'OFFLINE', mocked: false };
+  if (provider.status === 'error') return { text: 'ERR', mocked: false };
+  if (provider.updated_at) return { text: timeAgo(provider.updated_at) + ' ago', mocked: false };
+  return { text: '—', mocked: false };
+}
+
+function setMeta(id, provider) {
+  const m = metaTag(provider);
+  const e = el(id);
+  if (!e) return;
+  e.textContent = m.text;
+  e.classList.toggle('mocked', m.mocked);
+}
+
+function renderServices(p) {
+  setMeta('services-meta', p);
+  if (!p || p.status === 'pending') { setHtml('services-body', '<div class="dim">loading…</div>'); return; }
+  const items = p.items || {};
+  const order = ['anthropic', 'openai', 'github', 'linear', 'vercel'];
+  const labelFor = { anthropic: 'ANTHROPIC API', openai: 'OPENAI API', github: 'GITHUB', linear: 'LINEAR', vercel: 'VERCEL' };
+  let okCount = 0;
+  const rows = order.map(name => {
+    const it = items[name] || { indicator: 'unknown' };
+    const ind = it.indicator;
+    let dotCls = 'unknown', stateClass = 'dim', text = 'UNK';
+    if (ind === 'none')                        { dotCls = 'ok';   stateClass = 'ok';   text = 'OK'; okCount++; }
+    else if (ind === 'minor')                  { dotCls = 'warn'; stateClass = 'warn'; text = 'MINOR'; }
+    else if (ind === 'major' || ind === 'critical') { dotCls = 'alert'; stateClass = 'alert'; text = ind.toUpperCase(); }
+    return `<div class="row">
+      <span><span class="dot ${dotCls}"></span>${labelFor[name]}</span>
+      <span class="${stateClass}">${text}</span>
+    </div>`;
+  }).join('');
+  el('services-meta').textContent = `${okCount}/${order.length} OK`;
+  setHtml('services-body', rows);
+}
+
+function renderClaude(p) {
+  setMeta('claude-meta', p);
+  if (!p || p.status === 'pending') { setHtml('claude-body', '<div class="dim">loading…</div>'); return; }
+  const five = p.five_hour || {};
+  const week = p.weekly || {};
+  const fivePct = five.percent || 0;
+  const weekPct = week.percent || 0;
+  const fiveCls = fivePct >= 80 ? 'warn' : 'primary';
+  const weekCls = weekPct >= 80 ? 'warn' : 'primary';
+  setHtml('claude-body', `
+    <div class="row"><span class="dim">5-HR WINDOW</span><span>resets ${escapeHtml(five.resets_at || '—')}</span></div>
+    <div class="bar"><span class="btrack ${fiveCls}">${fmtBar(fivePct, 12)}</span><span class="bval ${fiveCls}">${fivePct}%</span></div>
+    <div class="row"><span class="dim">WEEKLY</span><span>resets ${escapeHtml(week.resets_at || '—')}</span></div>
+    <div class="bar"><span class="btrack ${weekCls}">${fmtBar(weekPct, 12)}</span><span class="bval ${weekCls}">${weekPct}%</span></div>
+  `);
+}
+
+function renderSessions(p) {
+  setMeta('sessions-meta', p);
+  if (!p || p.status === 'pending') { setHtml('sessions-body', '<div class="dim">loading…</div>'); return; }
+  const s = p.cc_sessions || { live: 0, idle: 0 };
+  setHtml('sessions-body', `
+    <div class="row"><span class="dim">LIVE</span><span class="accent blink-cursor">${s.live}</span></div>
+    <div class="row"><span class="dim">IDLE</span><span>${s.idle}</span></div>
+    <div class="row"><span class="dim">TOTAL TODAY</span><span>${(s.live + s.idle) * 4 || '—'}</span></div>
+    <div class="panel-foot">scan ~/.claude/local-agent-mode-sessions</div>
+  `);
+}
+
+function renderCalendar(p) {
+  setMeta('cal-meta', p);
+  if (!p || p.status === 'pending') { setHtml('cal-body', '<div class="dim">loading…</div>'); return; }
+  const events = p.events || [];
+  if (!events.length) { setHtml('cal-body', '<div class="dim">no events today</div>'); return; }
+  el('cal-meta').textContent = events.length + ' EVENTS' + (p.status === 'mocked' ? ' · MOCK' : '');
+  const rows = events.map(ev => {
+    let cls = '';
+    if (ev.is_now) cls = 'now';
+    else if (ev.is_next) cls = 'next';
+    const marker = ev.is_now ? '▸ NOW' : (ev.is_next ? '  NEXT' : '     ');
+    return `<div class="cal-row ${cls}">
+      <span class="when">${escapeHtml(marker)}  ${escapeHtml(ev.start)}</span>
+      <span class="what">${escapeHtml(ev.title)}</span>
+    </div>`;
+  }).join('');
+  setHtml('cal-body', rows);
+}
+
+function renderTasks(p) {
+  setMeta('tasks-meta', p);
+  if (!p || p.status === 'pending') { setHtml('tasks-body', '<div class="dim">loading…</div>'); return; }
+  const items = p.items || [];
+  el('tasks-meta').textContent = (p.open_count ?? items.length) + ' OPEN' + (p.status === 'mocked' ? ' · MOCK' : '');
+  const rows = items.map(t => {
+    const pri = t.priority === 'high' ? '!' : ' ';
+    const dueCls = t.due === 'TODAY' ? 'warn' : (/\d+D$/.test(t.due || '') ? 'alert' : 'dim');
+    return `<div class="task">
+      <span class="pri">${pri}</span>
+      <span class="src">${escapeHtml(t.source || '')}</span>
+      <span class="title">${escapeHtml(t.title || '')}</span>
+      <span class="due ${dueCls}">${escapeHtml(t.due || '')}</span>
+    </div>`;
+  }).join('');
+  setHtml('tasks-body', rows);
+}
+
+function renderGithub(p) {
+  setMeta('github-meta', p);
+  if (!p) { setHtml('github-body', '<div class="dim">loading…</div>'); return; }
+  if (p.status === 'unconfigured') {
+    setHtml('github-body', `<div class="err">unconfigured</div><div class="dim">${escapeHtml(p.message || '')}</div>`);
+    return;
+  }
+  if (p.status === 'error') {
+    setHtml('github-body', `<div class="err">${escapeHtml(p.error || 'error')}</div>`);
+    return;
+  }
+  el('github-meta').textContent = '@' + (p.username || '—');
+  const rr = p.review_requested || { count: 0, items: [] };
+  const my = p.my_open_prs || { count: 0 };
+  const ia = p.issues_assigned || { count: 0 };
+  const today = p.commits_today ?? 0;
+
+  let prList = '';
+  if (rr.items && rr.items.length) {
+    prList = '<div class="dim" style="margin-top:6px;font-size:11px">REVIEW REQUESTED</div>' + rr.items.map(pr => `
+      <div class="pr-item">
+        <span class="pr-title">#${pr.number} ${escapeHtml(pr.title)}</span>
+        <span class="pr-repo">${escapeHtml(pr.repo || '')}</span>
+      </div>
+    `).join('');
+  }
+  setHtml('github-body', `
+    <div class="row"><span class="dim">PRs awaiting review</span><span class="${rr.count > 0 ? 'warn' : 'ok'}">${rr.count}</span></div>
+    <div class="row"><span class="dim">PRs mine open</span><span>${my.count}</span></div>
+    <div class="row"><span class="dim">Issues assigned</span><span>${ia.count}</span></div>
+    <div class="row"><span class="dim">Commits today</span><span class="ok">${today}</span></div>
+    ${prList}
+  `);
+}
+
+function renderHeatmap(p) {
+  setMeta('heatmap-meta', p);
+  if (!p || !p.heatmap) {
+    if (p && p.status === 'unconfigured') {
+      setHtml('heatmap-body', '<div class="dim">unconfigured</div>');
+    } else {
+      setHtml('heatmap-body', '<div class="dim">loading…</div>');
+    }
+    return;
+  }
+  const days = (p.heatmap.recent_days || []).slice(-56); // 8 weeks
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const maxCount = Math.max(1, ...days.map(d => d.count));
+  // group into 7-day columns to look like a calendar grid (rotated)
+  // we'll display in 8 columns (weeks) x 7 rows (days)
+  const grid = [];
+  for (let w = 0; w < 8; w++) {
+    for (let r = 0; r < 7; r++) {
+      const idx = w * 7 + r;
+      const d = days[idx];
+      if (!d) { grid.push('<span class="day l0"></span>'); continue; }
+      const lvl = Math.min(5, Math.ceil((d.count / maxCount) * 5));
+      const isToday = d.date === todayIso ? '1' : '0';
+      grid.push(`<span class="day l${lvl}" data-today="${isToday}" title="${d.date}: ${d.count}"></span>`);
+    }
+  }
+  setHtml('heatmap-body', `
+    <div class="row"><span class="dim">Total (year)</span><span class="ok">${p.heatmap.total_year}</span></div>
+    <div class="heatmap">${grid.join('')}</div>
+    <div class="heatmap-legend">
+      less
+      <span class="sq" style="background:#003319"></span>
+      <span class="sq" style="background:#006633"></span>
+      <span class="sq" style="background:#009944"></span>
+      <span class="sq" style="background:#00cc55"></span>
+      <span class="sq" style="background:#00ff66"></span>
+      more
+    </div>
+  `);
+}
+
+function renderSystem(sys) {
+  if (!sys || sys.status === 'pending') { setText('syschip', 'CPU --% · MEM --% · UP --'); return; }
+  const cpu = sys.cpu_percent ?? 0;
+  const mem = sys.mem_percent ?? 0;
+  const up = sys.uptime || '—';
+  setText('syschip', `CPU ${cpu}% · MEM ${mem}% · UP ${up}`);
+}
+
+function renderTicker(events) {
+  if (!events || !events.length) {
+    setHtml('ticker-track', '<span class="dim">awaiting events…</span>');
+    return;
+  }
+  // Duplicate the list so the CSS scroll never has empty gaps
+  const items = events.slice(0, 30).reverse().map(ev => `
+    <span class="ticker-item ${escapeHtml(ev.level || 'info')}">
+      <span class="ts">[${escapeHtml((ev.ts || '').slice(11, 19))}]</span>
+      <span class="src">${escapeHtml(ev.source || '')}</span>
+      ${escapeHtml(ev.text || '')}
+    </span>
+  `).join('');
+  setHtml('ticker-track', items + items);
+}
+
+//------------------------------------------------------------------
+// Polling loop
+//------------------------------------------------------------------
+
+let lastTickerLen = -1;
+
+async function poll() {
+  try {
+    const r = await fetch('/api/state.json', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const s = await r.json();
+    document.body.classList.remove('offline');
+    el('connection').textContent = 'ONLINE';
+
+    const p = s.providers || {};
+    renderServices(p.services);
+    renderClaude(p.claude);
+    renderSessions(p.claude);
+    renderCalendar(p.calendar);
+    renderTasks(p.tasks);
+    renderGithub(p.github);
+    renderHeatmap(p.github);
+    renderSystem(p.system);
+
+    if ((s.ticker || []).length !== lastTickerLen) {
+      renderTicker(s.ticker || []);
+      lastTickerLen = (s.ticker || []).length;
+    }
+  } catch (e) {
+    document.body.classList.add('offline');
+    el('connection').textContent = 'OFFLINE';
+    console.warn('poll failed:', e);
+  }
+}
+
+//------------------------------------------------------------------
+// Boot
+//------------------------------------------------------------------
+
+renderClock();
+setInterval(renderClock, 1000);
+
+poll();
+setInterval(poll, 5000);
+</script>
+</body>
+</html>
