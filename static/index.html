@@ -247,9 +247,10 @@
   /* Heatmap */
   .heatmap {
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
+    grid-template-columns: repeat(20, minmax(0, 24px));
     gap: 3px;
-    margin: 8px 0 4px;
+    margin: 10px 0 4px;
+    justify-content: center;
   }
   .heatmap .day {
     aspect-ratio: 1;
@@ -831,7 +832,7 @@
 
       <div class="panel grow" id="panel-heatmap">
         <div class="panel-title">
-          <span class="ttl">CONTRIBUTIONS · 8W</span>
+          <span class="ttl">CONTRIBUTIONS · 20W</span>
           <span class="meta" id="heatmap-meta">—</span>
         </div>
         <div id="heatmap-body" class="dim">Loading…</div>
@@ -1058,13 +1059,13 @@ function renderHeatmap(p) {
     }
     return;
   }
-  const days = (p.heatmap.recent_days || []).slice(-56); // 8 weeks
+  const days = (p.heatmap.recent_days || []).slice(-140); // 20 weeks
   const todayIso = new Date().toISOString().slice(0, 10);
   const maxCount = Math.max(1, ...days.map(d => d.count));
   // group into 7-day columns to look like a calendar grid (rotated)
-  // we'll display in 8 columns (weeks) x 7 rows (days)
+  // 20 columns (weeks) x 7 rows (days)
   const grid = [];
-  for (let w = 0; w < 8; w++) {
+  for (let w = 0; w < 20; w++) {
     for (let r = 0; r < 7; r++) {
       const idx = w * 7 + r;
       const d = days[idx];

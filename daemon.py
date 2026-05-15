@@ -163,7 +163,7 @@ async def github_poll(token: str, username: str, interval: int) -> None:
                     d4.get("data", {}).get("user", {}).get("contributionsCollection", {}).get("contributionCalendar")
                 )
                 if cal:
-                    weeks = cal.get("weeks", [])[-8:]
+                    weeks = cal.get("weeks", [])[-20:]
                     days = []
                     for w in weeks:
                         for d in w.get("contributionDays", []):
