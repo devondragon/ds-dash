@@ -25,10 +25,10 @@ poll_seconds = 180
 # api_key = "lin_api_..."
 # poll_seconds = 60
 
-# [motion]
+[motion]
+# Get a personal API key at: Motion -> Settings -> API & Integrations
 # api_key = "..."
-# workspace_id = "..."
-# poll_seconds = 60
+poll_seconds = 60
 
 [calendar]
 # Path to ical-buddy. Auto-detected at /opt/homebrew/bin/icalBuddy or via PATH

@@ -380,6 +380,109 @@ async def calendar_poll(ical_buddy: str, look_ahead_days: int = 1, interval: int
         await asyncio.sleep(interval)
 
 
+# --------------------------------------------------------------------------- #
+# Motion provider (real — usemotion.com /v1/tasks)
+# --------------------------------------------------------------------------- #
+
+MOTION_TASKS_URL = "https://api.usemotion.com/v1/tasks"
+_MOTION_MAX_ITEMS = 12  # how many tasks we surface to the panel
+
+# Motion priority enum -> sort rank + frontend bucket.
+_MOTION_PRI_RANK = {"ASAP": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+_MOTION_PRI_OUT  = {"ASAP": "high", "HIGH": "high", "MEDIUM": "med", "LOW": "low"}
+
+
+def _motion_due_string(due_iso: str | None) -> str:
+    """Compact due display: OVERDUE / TODAY / TMRW / 3D / TUE / JUN 16."""
+    if not due_iso:
+        return ""
+    try:
+        due_dt = datetime.fromisoformat(due_iso.replace("Z", "+00:00")).astimezone()
+    except (ValueError, AttributeError):
+        return ""
+    delta = (due_dt.date() - datetime.now().date()).days
+    if delta < 0:
+        return "OVERDUE"
+    if delta == 0:
+        return "TODAY"
+    if delta == 1:
+        return "TMRW"
+    if delta < 7:
+        return f"{delta}D"
+    if delta < 14:
+        return due_dt.strftime("%a").upper()
+    return due_dt.strftime("%b %d").upper()
+
+
+def _motion_sort_key(t: dict) -> tuple:
+    """Priority rank asc, then due date asc (None last), then name."""
+    pri = _MOTION_PRI_RANK.get((t.get("priority") or "MEDIUM").upper(), 4)
+    due = t.get("dueDate") or "9999-12-31"
+    return (pri, due, t.get("name") or "")
+
+
+def _motion_to_item(t: dict) -> dict:
+    pri_raw = (t.get("priority") or "MEDIUM").upper()
+    return {
+        "source": "MOT",
+        "title": (t.get("name") or "").strip(),
+        "due": _motion_due_string(t.get("dueDate")),
+        "priority": _MOTION_PRI_OUT.get(pri_raw, "med"),
+    }
+
+
+async def motion_poll(api_key: str, interval: int = 60) -> None:
+    """Poll Motion tasks (pageSize ~50). Filters to active (not completed,
+    not in a resolved status), sorts by priority + due, sends top N to
+    the panel while reporting the full active count in open_count.
+    """
+    headers = {"X-API-Key": api_key, "Accept": "application/json", "User-Agent": "cowork-dash/0.1"}
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=20, headers=headers) as c:
+                r = await c.get(MOTION_TASKS_URL)
+                r.raise_for_status()
+                data = r.json()
+            tasks = data.get("tasks") or []
+            active = [
+                t for t in tasks
+                if not t.get("completed")
+                and not (t.get("status") or {}).get("isResolvedStatus")
+            ]
+            # Collapse recurring task occurrences to one row per template:
+            # keep only the earliest-due instance per parentRecurringTaskId.
+            # Non-recurring tasks get their own task id as the dedup key.
+            by_key: dict[str, dict] = {}
+            for t in active:
+                key = t.get("parentRecurringTaskId") or t.get("id") or ""
+                if not key:
+                    continue
+                existing = by_key.get(key)
+                if not existing or (t.get("dueDate") or "9999") < (existing.get("dueDate") or "9999"):
+                    by_key[key] = t
+            deduped = sorted(by_key.values(), key=_motion_sort_key)
+            STATE["providers"]["tasks"] = {
+                "status": "ok",
+                "updated_at": _now_iso(),
+                "open_count": len(deduped),
+                "items": [_motion_to_item(t) for t in deduped[:_MOTION_MAX_ITEMS]],
+            }
+        except httpx.HTTPStatusError as e:
+            STATE["providers"]["tasks"] = {
+                "status": "error",
+                "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}",
+                "updated_at": _now_iso(),
+            }
+        except Exception as e:
+            STATE["providers"]["tasks"] = {
+                "status": "error",
+                "error": f"{type(e).__name__}: {e}",
+                "updated_at": _now_iso(),
+            }
+        await asyncio.sleep(interval)
+
+
+# Legacy mock kept for reference; not started by lifespan when [motion].api_key is set.
 async def mock_tasks_poll() -> None:
     """Mocked unified task list until Motion + Linear are wired up."""
     while True:
@@ -544,7 +647,18 @@ async def lifespan(_app: FastAPI):
             "message": "Install ical-buddy (brew install ical-buddy) or set [calendar].ical_buddy_path",
         }
 
-    BACKGROUND_TASKS.append(asyncio.create_task(mock_tasks_poll()))
+    mot = cfg.get("motion") or {}
+    if mot.get("api_key"):
+        BACKGROUND_TASKS.append(asyncio.create_task(
+            motion_poll(mot["api_key"], mot.get("poll_seconds", 60))
+        ))
+        _push_ticker("daemon", "motion provider online", "info")
+    else:
+        STATE["providers"]["tasks"] = {
+            "status": "unconfigured",
+            "message": "Add [motion] api_key to ~/.cowork-dash/config.toml",
+        }
+
     BACKGROUND_TASKS.append(asyncio.create_task(mock_claude_poll()))
     sysc = cfg.get("system") or {}
     BACKGROUND_TASKS.append(asyncio.create_task(system_poll(sysc.get("poll_seconds", 5))))
