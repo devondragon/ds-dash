@@ -560,6 +560,16 @@ query DashboardSnapshot {
 """.strip()
 
 
+def _neg_epoch(iso: str | None) -> float:
+    """Negative epoch seconds — used in sort tuples for descending order via ascending sort."""
+    if not iso:
+        return 0.0
+    try:
+        return -datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp()
+    except (ValueError, AttributeError):
+        return 0.0
+
+
 def _linear_to_item(node: dict) -> dict:
     """Convert a Linear issue node to the frontend item shape."""
     pri_int = node.get("priority") or 0
@@ -578,13 +588,13 @@ def _linear_to_item(node: dict) -> dict:
         # internal — used only for sorting, NOT serialized to the panel:
         "_pri_rank": _LINEAR_PRI_RANK.get(pri_int, 4),
         "_due_iso": node.get("dueDate") or "9999-12-31",
-        "_updated_at": node.get("updatedAt") or "",
+        "_updated_at_neg": _neg_epoch(node.get("updatedAt")),
     }
 
 
 def _linear_sort_key(item: dict) -> tuple:
     """Priority rank asc, due date asc (None last), updatedAt desc."""
-    return (item["_pri_rank"], item["_due_iso"], item["_updated_at"])
+    return (item["_pri_rank"], item["_due_iso"], item["_updated_at_neg"])
 
 
 def _linear_active_cycle(nodes: list[dict]) -> dict:
