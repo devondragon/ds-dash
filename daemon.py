@@ -14,8 +14,9 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-import random
+import socket
 import sys
+import time
 from datetime import datetime, timezone, timedelta
 
 try:
@@ -26,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import psutil
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -258,21 +260,51 @@ async def mock_claude_poll() -> None:
         await asyncio.sleep(15)
 
 
-async def mock_system_poll() -> None:
-    """System stats placeholder. Real impl uses psutil."""
+async def system_poll(interval: int = 5) -> None:
+    """System stats via psutil. Network rates are computed between polls."""
+    host = socket.gethostname().split(".")[0]
+    boot_ts = psutil.boot_time()
+    # On macOS Big Sur+ "/" is a tiny read-only system volume; the user's data
+    # is on /System/Volumes/Data. Fall back to "/" on Linux / older macOS.
+    disk_root = "/System/Volumes/Data" if os.path.isdir("/System/Volumes/Data") else "/"
+
+    # Prime cpu_percent so the first real value isn't 0.0
+    psutil.cpu_percent(interval=None)
+    prev_net = psutil.net_io_counters()
+    prev_ts = time.monotonic()
+
     while True:
-        STATE["providers"]["system"] = {
-            "status": "mocked",
-            "updated_at": _now_iso(),
-            "cpu_percent": 35 + random.randint(0, 25),
-            "mem_percent": 58 + random.randint(0, 8),
-            "disk_percent": 73,
-            "net_up_mbps":   round(1.5 + random.random() * 2, 1),
-            "net_down_mbps": round(5.0 + random.random() * 4, 1),
-            "uptime": "14d 03h 22m",
-            "host": "m1-max",
-        }
-        await asyncio.sleep(5)
+        try:
+            now_ts = time.monotonic()
+            dt = max(1e-3, now_ts - prev_ts)
+            net = psutil.net_io_counters()
+            up_mbps = ((net.bytes_sent - prev_net.bytes_sent) * 8) / dt / 1_000_000
+            down_mbps = ((net.bytes_recv - prev_net.bytes_recv) * 8) / dt / 1_000_000
+            prev_net, prev_ts = net, now_ts
+
+            uptime_secs = int(time.time() - boot_ts)
+            days, rem = divmod(uptime_secs, 86400)
+            hours, rem = divmod(rem, 3600)
+            mins = rem // 60
+
+            STATE["providers"]["system"] = {
+                "status": "ok",
+                "updated_at": _now_iso(),
+                "cpu_percent": int(psutil.cpu_percent(interval=None)),
+                "mem_percent": int(psutil.virtual_memory().percent),
+                "disk_percent": int(psutil.disk_usage(disk_root).percent),
+                "net_up_mbps": round(max(0.0, up_mbps), 1),
+                "net_down_mbps": round(max(0.0, down_mbps), 1),
+                "uptime": f"{days}d {hours:02d}h {mins:02d}m",
+                "host": host,
+            }
+        except Exception as e:
+            STATE["providers"]["system"] = {
+                "status": "error",
+                "error": f"{type(e).__name__}: {e}",
+                "updated_at": _now_iso(),
+            }
+        await asyncio.sleep(interval)
 
 
 async def services_poll(interval: int = 300) -> None:
@@ -338,7 +370,8 @@ async def lifespan(_app: FastAPI):
     BACKGROUND_TASKS.append(asyncio.create_task(mock_calendar_poll()))
     BACKGROUND_TASKS.append(asyncio.create_task(mock_tasks_poll()))
     BACKGROUND_TASKS.append(asyncio.create_task(mock_claude_poll()))
-    BACKGROUND_TASKS.append(asyncio.create_task(mock_system_poll()))
+    sysc = cfg.get("system") or {}
+    BACKGROUND_TASKS.append(asyncio.create_task(system_poll(sysc.get("poll_seconds", 5))))
     BACKGROUND_TASKS.append(asyncio.create_task(services_poll()))
 
     _push_ticker("daemon", "cowork-dash online", "info")

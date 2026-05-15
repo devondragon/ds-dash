@@ -40,8 +40,8 @@ poll_seconds = 180
 # credentials = "~/.cowork-dash/gmail-credentials.json"
 # token = "~/.cowork-dash/gmail-token.json"
 
-# [system]
-# poll_seconds = 5
+[system]
+poll_seconds = 5
 
 # [claude_code]
 # # Directory to scan for active CC sessions
