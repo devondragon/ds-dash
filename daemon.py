@@ -393,8 +393,12 @@ _MOTION_PRI_RANK = {"ASAP": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
 _MOTION_PRI_OUT  = {"ASAP": "high", "HIGH": "high", "MEDIUM": "med", "LOW": "low"}
 
 
-def _motion_due_string(due_iso: str | None) -> str:
-    """Compact due display: OVERDUE / TODAY / TMRW / 3D / TUE / JUN 16."""
+def _due_string(due_iso: str | None) -> str:
+    """Compact due display: OVERDUE / TODAY / TMRW / 3D / TUE / JUN 16.
+
+    Generic — used by both Motion and Linear (and any future provider with
+    ISO due timestamps).
+    """
     if not due_iso:
         return ""
     try:
@@ -413,6 +417,12 @@ def _motion_due_string(due_iso: str | None) -> str:
     if delta < 14:
         return due_dt.strftime("%a").upper()
     return due_dt.strftime("%b %d").upper()
+
+
+def _motion_due_string(due_iso: str | None) -> str:
+    """Compat shim — delegates to the shared helper. Kept so existing
+    callers don't need to change in the same diff."""
+    return _due_string(due_iso)
 
 
 def _motion_sort_key(t: dict) -> tuple:
