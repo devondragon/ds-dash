@@ -645,7 +645,7 @@ async def linear_poll(label: str, api_key: str, interval: int) -> None:
         "User-Agent": "cowork-dash/0.1",
     }
     prev_ids: set[str] = set()
-    prev_states: dict[str, str] = {}   # id -> state_name
+    prev_states: dict[str, str] = {}
     first_poll = True
     while True:
         try:
@@ -670,16 +670,18 @@ async def linear_poll(label: str, api_key: str, interval: int) -> None:
 
             if not first_poll:
                 for it in shaped_all:
-                    if it["id"] and it["id"] not in prev_ids:
-                        text = f"{label} · NEW: {it['identifier']} {it['title']}"[:140]
-                        _push_ticker(f"linear-{label}", text, "info")
-                for it in shaped_all:
                     iid = it["id"]
-                    if not iid or iid not in prev_ids:
+                    if not iid:
+                        continue
+                    if iid not in prev_ids:
+                        _push_ticker(
+                            f"linear-{label}",
+                            f"{label} · NEW: {it['identifier']} {it['title']}",
+                            "info",
+                        )
                         continue
                     new_name = it["state_name"]
-                    old_name = prev_states.get(iid, "")
-                    if new_name == old_name:
+                    if new_name == prev_states[iid]:
                         continue
                     if it["state_type"] == "completed":
                         _push_ticker(
