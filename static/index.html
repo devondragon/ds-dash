@@ -6,22 +6,34 @@
 <title>COWORK://DASHBOARD</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #050a05;
-    --bg-panel: rgba(0, 40, 20, 0.22);
-    --border: #00cc44;
-    --primary: #00ff66;
-    --primary-dim: #00aa44;
-    --primary-deep: #007733;
-    --primary-deeper: #004422;
-    --accent: #00ccff;
-    --warn: #ffaa00;
-    --alert: #ff3344;
-    --header-amber: #ffaa00;
-    --vt: 'VT323', monospace;
-    --mono: 'Share Tech Mono', 'Courier New', monospace;
+    /* NIGHTOPS — safehouse navy + Tron cyan + cyberpunk amber, magenta reserved for alarms */
+    --bg: #03060f;
+    --panel: #0a1530;
+    --rule: #1a3060;
+    --dim: #3a7090;
+    --cyan: #5fc8e8;
+    --amber: #ffaa44;
+    --gold: #ffe88a;
+    --magenta: #ff2a6d;
+
+    /* Aliases so existing rules adopt the new palette without rewrites */
+    --bg-panel: rgba(10, 21, 48, 0.55);
+    --border: var(--rule);
+    --primary: var(--cyan);
+    --primary-dim: var(--dim);
+    --primary-deep: #2a5070;
+    --primary-deeper: #15304a;
+    --accent: var(--amber);
+    --warn: var(--gold);
+    --alert: var(--magenta);
+    --header-amber: var(--gold);
+
+    --sans: 'Inter', system-ui, sans-serif;
+    --vt: 'Bebas Neue', 'Inter', sans-serif;
+    --mono: 'IBM Plex Mono', 'Courier New', monospace;
   }
 
   * { box-sizing: border-box; }
@@ -50,23 +62,12 @@
     pointer-events: none;
     background: repeating-linear-gradient(
       0deg,
-      rgba(0, 255, 102, 0.035) 0px,
-      rgba(0, 255, 102, 0.035) 1px,
+      rgba(95, 200, 232, 0.022) 0px,
+      rgba(95, 200, 232, 0.022) 1px,
       transparent 1px,
-      transparent 3px
+      transparent 4px
     );
     z-index: 100;
-  }
-
-  /* CRT vignette */
-  body::after {
-    content: '';
-    position: fixed; inset: 0;
-    pointer-events: none;
-    background: radial-gradient(ellipse at center,
-      transparent 35%,
-      rgba(0,0,0,0.45) 100%);
-    z-index: 101;
   }
 
   .layout {
@@ -76,32 +77,58 @@
     height: 100%;
   }
 
-  /* ---------- header strip ---------- */
+  /* ---------- header strip (NIGHTOPS) ---------- */
   .hdr {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    border: 1px solid var(--border);
-    padding: 6px 12px;
-    background: rgba(0, 255, 102, 0.04);
+    padding: 10px 22px 10px 24px;
+    background: rgba(10, 21, 48, 0.55);
+    border: 1px solid var(--rule);
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    /* slashed top-left + bracketed bottom-right */
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  }
+  .hdr .left { color: var(--dim); display: flex; align-items: center; gap: 12px; }
+  .hdr .center {
+    color: var(--gold);
+    text-align: center;
     font-family: var(--vt);
-    font-size: 18px;
-    letter-spacing: 1px;
+    font-size: 32px;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    text-shadow: 0 0 12px rgba(255, 232, 138, 0.35);
   }
-  .hdr .left { color: #00ff99; }
-  .hdr .center { color: var(--primary); text-align: center; }
-  .hdr .right { color: var(--header-amber); text-align: right; }
-  .hdr .right .sys { font-size: 13px; font-family: var(--mono); color: var(--primary-dim); margin-right: 16px; }
+  .hdr .right { color: var(--dim); text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 18px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; }
+  .hdr .right .sys { color: var(--dim); }
+  .hdr .op-prefix { color: var(--dim); font-weight: 400; }
+  .hdr .op-name { color: var(--cyan); font-weight: 600; letter-spacing: 0.18em; }
 
-  .badge {
+  .rec-dot {
     display: inline-block;
-    padding: 0 6px;
-    border: 1px solid currentColor;
-    margin-right: 6px;
-    font-size: 12px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--magenta);
+    box-shadow: 0 0 8px var(--magenta);
+    animation: pulse 1.4s infinite;
   }
-  .badge.live { color: var(--primary); }
-  .badge.live::before { content: '● '; animation: pulse 1.5s infinite; }
+  .op-status {
+    display: inline-block;
+    border: 1px solid var(--rule);
+    padding: 3px 8px;
+    color: var(--amber);
+    font-family: var(--sans);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    margin-left: 4px;
+  }
+  body.offline .op-status { color: var(--magenta); border-color: var(--magenta); }
+  body.offline .rec-dot { background: var(--magenta); }
+
   @keyframes pulse {
     0%, 60% { opacity: 1; }
     61%, 100% { opacity: 0.25; }
@@ -127,15 +154,18 @@
   .panel.grow { flex: 1; }
 
   .panel-title {
-    color: var(--accent);
+    color: var(--cyan);
+    font-family: var(--sans);
     font-size: 11px;
-    letter-spacing: 2px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
     margin-bottom: 7px;
     border-bottom: 1px dashed var(--primary-deep);
     padding-bottom: 4px;
     display: flex;
     justify-content: space-between;
     align-items: baseline;
+    text-transform: uppercase;
   }
   .panel-title .ttl::before { content: '▌ '; }
   .panel-title .meta { color: var(--primary-deep); font-size: 11px; }
@@ -324,7 +354,6 @@
     pointer-events: none;
   }
   body.offline .offline-overlay { display: block; }
-  body.offline .hdr .badge.live { color: var(--alert); }
 
   /* small spark bars (mini activity strips) */
   .spark {
@@ -350,6 +379,73 @@
     display: inline-block;
     margin: 4px 0;
   }
+
+  /* ---------- NIGHTOPS panel chrome (in-progress style; opt-in via .panel-nightops) ---------- */
+  .panel-nightops {
+    background: transparent !important;
+    border: none !important;
+    position: relative;
+    padding: 0 !important;
+  }
+  .panel-nightops::before,
+  .panel-nightops::after {
+    content: '';
+    position: absolute;
+    clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+    pointer-events: none;
+  }
+  .panel-nightops::before { inset: 0; background: var(--rule); }
+  .panel-nightops::after  { inset: 1px; background: var(--panel); }
+  .panel-nightops > * { position: relative; z-index: 1; }
+
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--rule);
+    padding-left: 16px;
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  .panel-tabs .tab {
+    padding: 7px 11px;
+    color: var(--dim);
+    border-right: 1px solid var(--rule);
+    user-select: none;
+  }
+  .panel-tabs .tab.active {
+    color: var(--amber);
+    background: rgba(255, 170, 68, 0.07);
+    box-shadow: inset 0 -1px 0 var(--amber);
+  }
+  .panel-tabs .tab.dead { color: var(--primary-deeper); }
+
+  .panel-body { padding: 10px 14px 14px; }
+  .panel-body .panel-title {
+    color: var(--cyan);
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 5px;
+    margin-bottom: 8px;
+  }
+
+  .panel-stamp {
+    position: absolute;
+    bottom: 5px;
+    right: 11px;
+    color: var(--dim);
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0.75;
+  }
+  .panel-stamp::before {
+    content: '└─ ';
+    color: var(--amber);
+    opacity: 0.85;
+  }
 </style>
 </head>
 <body>
@@ -359,13 +455,14 @@
   <!-- HEADER -->
   <div class="hdr">
     <div class="left">
-      <span class="badge live" id="connection">ONLINE</span>
-      ▎ COWORK://DASHBOARD ▎ DEVON
+      <span class="rec-dot"></span>
+      <span class="op-prefix">OPERATOR://</span><span class="op-name">DEVON</span>
+      <span class="op-status" id="connection">ON STATION</span>
     </div>
-    <div class="center" id="clock">--:--:-- · -- ---</div>
+    <div class="center" id="clock">--:--:--</div>
     <div class="right">
       <span class="sys" id="syschip">CPU --% · MEM --% · UP --</span>
-      <span id="weather">62°F ☁ SF</span>
+      <span id="weather">62°F · SF</span>
     </div>
   </div>
 
@@ -420,12 +517,21 @@
 
     <!-- RIGHT COL: GitHub, Heatmap -->
     <div class="col">
-      <div class="panel" id="panel-github">
-        <div class="panel-title">
-          <span class="ttl">GITHUB</span>
-          <span class="meta" id="github-meta">—</span>
+      <div class="panel panel-nightops" id="panel-github">
+        <div class="panel-tabs">
+          <span class="tab active">OVERVIEW</span>
+          <span class="tab dead">PRS</span>
+          <span class="tab dead">ISSUES</span>
+          <span class="tab dead">ACTIVITY</span>
         </div>
-        <div id="github-body" class="dim">Loading…</div>
+        <div class="panel-body">
+          <div class="panel-title">
+            <span class="ttl">GITHUB</span>
+            <span class="meta" id="github-meta">—</span>
+          </div>
+          <div id="github-body" class="dim">Loading…</div>
+        </div>
+        <span class="panel-stamp">LK-R3 · SP1-7</span>
       </div>
 
       <div class="panel grow" id="panel-heatmap">
@@ -724,7 +830,7 @@ async function poll() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const s = await r.json();
     document.body.classList.remove('offline');
-    el('connection').textContent = 'ONLINE';
+    el('connection').textContent = 'ON STATION';
 
     const p = s.providers || {};
     renderServices(p.services);
