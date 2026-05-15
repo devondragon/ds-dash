@@ -508,6 +508,127 @@ async def mock_tasks_poll() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Linear provider (real — api.linear.app GraphQL)
+# --------------------------------------------------------------------------- #
+# One coroutine per workspace. Each writes to STATE["providers"]["linear"][label].
+# Combined GraphQL query: viewer.assignedIssues + cycles(isActive). The assigned
+# filter is intentionally NOT applied server-side so we can detect transitions
+# *into* completed/canceled before client-side filtering hides those issues.
+
+LINEAR_API = "https://api.linear.app/graphql"
+_LINEAR_MAX_ITEMS = 8           # how many issues we render per panel
+_LINEAR_MIN_INTERVAL = 60        # floor for poll_seconds
+_LINEAR_DEFAULT_INTERVAL = 90
+
+# Linear priority int -> (sort rank, frontend bucket).
+_LINEAR_PRI_RANK = {1: 0, 2: 1, 3: 2, 4: 3, 0: 4}
+_LINEAR_PRI_OUT  = {1: "high", 2: "high", 3: "med", 4: "low", 0: "none"}
+
+LINEAR_GQL = """
+query DashboardSnapshot {
+  viewer {
+    id
+    name
+    assignedIssues(first: 50, orderBy: updatedAt) {
+      nodes {
+        id
+        identifier
+        title
+        priority
+        dueDate
+        updatedAt
+        url
+        state { name type }
+        team { key }
+        cycle { number id }
+      }
+    }
+  }
+  cycles(first: 5, filter: { isActive: { eq: true } }) {
+    nodes {
+      id
+      number
+      name
+      startsAt
+      endsAt
+      progress
+      issueCountHistory
+      completedIssueCountHistory
+    }
+  }
+}
+""".strip()
+
+
+def _linear_to_item(node: dict) -> dict:
+    """Convert a Linear issue node to the frontend item shape."""
+    pri_int = node.get("priority") or 0
+    state = node.get("state") or {}
+    team = node.get("team") or {}
+    return {
+        "id": node.get("id") or "",
+        "identifier": node.get("identifier") or "",
+        "title": (node.get("title") or "").strip(),
+        "team": team.get("key") or "",
+        "priority": _LINEAR_PRI_OUT.get(pri_int, "none"),
+        "due": _due_string(node.get("dueDate")),
+        "state_name": state.get("name") or "",
+        "state_type": state.get("type") or "",
+        "url": node.get("url") or "",
+        # internal — used only for sorting, NOT serialized to the panel:
+        "_pri_rank": _LINEAR_PRI_RANK.get(pri_int, 4),
+        "_due_iso": node.get("dueDate") or "9999-12-31",
+        "_updated_at": node.get("updatedAt") or "",
+    }
+
+
+def _linear_sort_key(item: dict) -> tuple:
+    """Priority rank asc, due date asc (None last), updatedAt desc."""
+    return (item["_pri_rank"], item["_due_iso"], item["_updated_at"])
+
+
+def _linear_active_cycle(nodes: list[dict]) -> dict:
+    """Pick the soonest-ending currently-active cycle from the workspace.
+
+    Local sanity-check on startsAt/endsAt to defend against clock skew.
+    Returns {"present": False} when no active cycle.
+    """
+    import math
+    now = datetime.now(timezone.utc)
+    actives: list[tuple] = []
+    for c in nodes or []:
+        try:
+            starts = datetime.fromisoformat((c.get("startsAt") or "").replace("Z", "+00:00"))
+            ends = datetime.fromisoformat((c.get("endsAt") or "").replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            continue
+        if starts <= now < ends:
+            actives.append((ends, c))
+    if not actives:
+        return {"present": False}
+    actives.sort(key=lambda t: t[0])
+    ends, c = actives[0]
+    issued = c.get("issueCountHistory") or []
+    completed = c.get("completedIssueCountHistory") or []
+    total = int(issued[-1]) if issued else 0
+    done = int(completed[-1]) if completed else 0
+    progress_pct = int(round((c.get("progress") or 0.0) * 100))
+    days_to_end = (ends - now).total_seconds() / 86400.0
+    # Round toward "humans say 'in X days'": ceil for future, floor for past.
+    ends_in_days = math.ceil(days_to_end) if days_to_end >= 0 else math.floor(days_to_end)
+    return {
+        "present": True,
+        "number": c.get("number"),
+        "name": c.get("name") or f"Cycle {c.get('number')}",
+        "ends_in_days": ends_in_days,
+        "progress_pct": progress_pct,
+        "completed": done,
+        "total": total,
+        "multi_team": len(actives) > 1,
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Claude usage + CC sessions (real — walks ~/.claude/projects)
 # --------------------------------------------------------------------------- #
 # Each .jsonl under ~/.claude/projects/<project>/ is one Claude Code session.
