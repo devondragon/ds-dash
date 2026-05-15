@@ -639,8 +639,6 @@ def _linear_active_cycle(nodes: list[dict]) -> dict:
 
 
 async def linear_poll(label: str, api_key: str, interval: int) -> None:
-    """Poll one Linear workspace via GraphQL. Writes to
-    STATE["providers"]["linear"][label]. Ticker diffing is added separately."""
     headers = {
         "Authorization": api_key,            # personal keys: NO "Bearer " prefix
         "Content-Type": "application/json",
@@ -1001,8 +999,8 @@ async def lifespan(_app: FastAPI):
     # Temporary single-workspace wiring — Task 5 replaces this with
     # multi-workspace iteration. Reads first [[linear]] block only.
     lin_blocks = cfg.get("linear") or []
-    if lin_blocks and isinstance(lin_blocks, list):
-        first = lin_blocks[0] or {}
+    if lin_blocks:
+        first = lin_blocks[0]
         if first.get("label") and first.get("api_key"):
             label = first["label"]
             STATE["providers"]["linear"][label] = {"status": "pending"}
