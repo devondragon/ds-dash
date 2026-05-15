@@ -256,12 +256,14 @@
     background: var(--primary-deeper);
     border: 1px solid transparent;
   }
-  .heatmap .day.l1 { background: #003319; }
-  .heatmap .day.l2 { background: #006633; }
-  .heatmap .day.l3 { background: #009944; }
-  .heatmap .day.l4 { background: #00cc55; }
-  .heatmap .day.l5 { background: #00ff66; box-shadow: 0 0 4px var(--primary); }
-  .heatmap .day[data-today="1"] { border-color: var(--accent); }
+  /* Cyan-tinted intensity ramp to match NIGHTOPS — low = barely-there over panel navy,
+     high = bright cyan with subtle bloom. */
+  .heatmap .day.l1 { background: rgba(95, 200, 232, 0.18); }
+  .heatmap .day.l2 { background: rgba(95, 200, 232, 0.38); }
+  .heatmap .day.l3 { background: rgba(95, 200, 232, 0.60); }
+  .heatmap .day.l4 { background: rgba(95, 200, 232, 0.82); }
+  .heatmap .day.l5 { background: var(--cyan); box-shadow: 0 0 4px var(--cyan); }
+  .heatmap .day[data-today="1"] { border-color: var(--amber); }
 
   .heatmap-legend {
     display: flex;
@@ -1077,11 +1079,11 @@ function renderHeatmap(p) {
     <div class="heatmap">${grid.join('')}</div>
     <div class="heatmap-legend">
       less
-      <span class="sq" style="background:#003319"></span>
-      <span class="sq" style="background:#006633"></span>
-      <span class="sq" style="background:#009944"></span>
-      <span class="sq" style="background:#00cc55"></span>
-      <span class="sq" style="background:#00ff66"></span>
+      <span class="sq" style="background:rgba(95,200,232,0.18)"></span>
+      <span class="sq" style="background:rgba(95,200,232,0.38)"></span>
+      <span class="sq" style="background:rgba(95,200,232,0.60)"></span>
+      <span class="sq" style="background:rgba(95,200,232,0.82)"></span>
+      <span class="sq" style="background:#5fc8e8"></span>
       more
     </div>
   `);
