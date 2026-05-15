@@ -336,6 +336,18 @@ async def calendar_poll(ical_buddy: str, look_ahead_days: int = 1, interval: int
             else:
                 events = _parse_ical_buddy(stdout.decode("utf-8", errors="replace"))
                 _annotate_now_next(events)
+                # Drop events that have already ended — the panel is "what's left today",
+                # not a log of everything you missed. All-day events stay.
+                now = datetime.now()
+                def _still_active(ev: dict) -> bool:
+                    if ev["is_all_day"] or not ev.get("end_time"):
+                        return True
+                    try:
+                        end_dt = datetime.fromisoformat(f"{ev['end_date']}T{ev['end_time']}")
+                    except ValueError:
+                        return True
+                    return end_dt > now
+                events = [e for e in events if _still_active(e)]
                 STATE["providers"]["calendar"] = {
                     "status": "ok",
                     "updated_at": _now_iso(),
