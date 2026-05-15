@@ -55,6 +55,7 @@ STATE: dict[str, Any] = {
         "claude": {"status": "pending"},
         "services": {"status": "pending"},
         "system": {"status": "pending"},
+        "linear": {},   # populated per-workspace at startup; sentinel set if unconfigured
     },
     "ticker": [],  # list of {ts, source, text, level}
 }
@@ -637,6 +638,69 @@ def _linear_active_cycle(nodes: list[dict]) -> dict:
     }
 
 
+async def linear_poll(label: str, api_key: str, interval: int) -> None:
+    """Poll one Linear workspace via GraphQL. Writes to
+    STATE["providers"]["linear"][label]. Ticker diffing is added separately."""
+    headers = {
+        "Authorization": api_key,            # personal keys: NO "Bearer " prefix
+        "Content-Type": "application/json",
+        "User-Agent": "cowork-dash/0.1",
+    }
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=20, headers=headers) as c:
+                r = await c.post(LINEAR_API, json={"query": LINEAR_GQL})
+                r.raise_for_status()
+                payload = r.json()
+
+            errs = payload.get("errors")
+            if errs:
+                msg = (errs[0].get("message") or "unknown")[:200]
+                raise RuntimeError(f"GraphQL: {msg}")
+
+            data = payload.get("data") or {}
+            viewer = data.get("viewer") or {}
+            raw_nodes = ((viewer.get("assignedIssues") or {}).get("nodes")) or []
+            cycle_nodes = ((data.get("cycles") or {}).get("nodes")) or []
+
+            shaped_all = [_linear_to_item(n) for n in raw_nodes]
+            visible = [
+                it for it in shaped_all
+                if it["state_type"] not in ("completed", "canceled")
+            ]
+            visible.sort(key=_linear_sort_key)
+            open_count = len(visible)
+            items = []
+            for it in visible[:_LINEAR_MAX_ITEMS]:
+                items.append({k: v for k, v in it.items() if not k.startswith("_")})
+
+            STATE["providers"]["linear"][label] = {
+                "status": "ok",
+                "updated_at": _now_iso(),
+                "label": label,
+                "viewer": {"name": viewer.get("name") or ""},
+                "issues": {"open_count": open_count, "items": items},
+                "cycle": _linear_active_cycle(cycle_nodes),
+            }
+        except httpx.HTTPStatusError as e:
+            STATE["providers"]["linear"][label] = {
+                **(STATE["providers"]["linear"].get(label) or {}),
+                "status": "error",
+                "label": label,
+                "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}",
+                "updated_at": _now_iso(),
+            }
+        except Exception as e:
+            STATE["providers"]["linear"][label] = {
+                **(STATE["providers"]["linear"].get(label) or {}),
+                "status": "error",
+                "label": label,
+                "error": f"{type(e).__name__}: {e}",
+                "updated_at": _now_iso(),
+            }
+        await asyncio.sleep(interval)
+
+
 # --------------------------------------------------------------------------- #
 # Claude usage + CC sessions (real — walks ~/.claude/projects)
 # --------------------------------------------------------------------------- #
@@ -932,6 +996,25 @@ async def lifespan(_app: FastAPI):
         STATE["providers"]["tasks"] = {
             "status": "unconfigured",
             "message": "Add [motion] api_key to ~/.cowork-dash/config.toml",
+        }
+
+    # Temporary single-workspace wiring — Task 5 replaces this with
+    # multi-workspace iteration. Reads first [[linear]] block only.
+    lin_blocks = cfg.get("linear") or []
+    if lin_blocks and isinstance(lin_blocks, list):
+        first = lin_blocks[0] or {}
+        if first.get("label") and first.get("api_key"):
+            label = first["label"]
+            STATE["providers"]["linear"][label] = {"status": "pending"}
+            BACKGROUND_TASKS.append(asyncio.create_task(linear_poll(
+                label, first["api_key"],
+                max(_LINEAR_MIN_INTERVAL, first.get("poll_seconds", _LINEAR_DEFAULT_INTERVAL)),
+            )))
+            _push_ticker("daemon", f"linear provider online ({label})", "info")
+    if not STATE["providers"]["linear"]:
+        STATE["providers"]["linear"] = {
+            "status": "unconfigured",
+            "message": "Add [[linear]] blocks to ~/.cowork-dash/config.toml",
         }
 
     cl = cfg.get("claude") or {}
