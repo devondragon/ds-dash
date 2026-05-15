@@ -144,6 +144,7 @@ Current defaults:
 | services | 300s     | public status pages change rarely                       |
 | calendar | 60s      | "next event" needs minute-level freshness               |
 | motion   | 60s      | API rate-limit friendly; tasks change at minute scale   |
+| linear   | 90s      | per-workspace; complexity-based rate limit, well under budget |
 | claude   | 60s      | full `~/.claude` scan; not worth more frequent          |
 | system   | 5s       | local + cheap, feeds net-trace history samples          |
 
@@ -291,8 +292,8 @@ All seven panels are real:
 | system        | psutil — cpu, mem, disk, net (+ 5-min rolling history for trace)          |
 | calendar      | ical-buddy (Homebrew, auto-detected)                                      |
 | tasks         | api.usemotion.com /v1/tasks (with recurring-template dedup)               |
+| linear        | api.linear.app GraphQL — one [[linear]] block per workspace, separate panel each |
 | claude usage  | scan of `~/.claude/projects/**/*.jsonl` for user-message timestamps       |
 | cc sessions   | same scan, jsonl mtime → live / idle / today                              |
 
-Planned but not yet shipped: linear (would merge with motion in tasks),
-gmail.
+Planned but not yet shipped: gmail.
