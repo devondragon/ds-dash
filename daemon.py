@@ -419,12 +419,6 @@ def _due_string(due_iso: str | None) -> str:
     return due_dt.strftime("%b %d").upper()
 
 
-def _motion_due_string(due_iso: str | None) -> str:
-    """Compat shim — delegates to the shared helper. Kept so existing
-    callers don't need to change in the same diff."""
-    return _due_string(due_iso)
-
-
 def _motion_sort_key(t: dict) -> tuple:
     """Priority rank asc, then due date asc (None last), then name."""
     pri = _MOTION_PRI_RANK.get((t.get("priority") or "MEDIUM").upper(), 4)
@@ -437,7 +431,7 @@ def _motion_to_item(t: dict) -> dict:
     return {
         "source": "MOT",
         "title": (t.get("name") or "").strip(),
-        "due": _motion_due_string(t.get("dueDate")),
+        "due": _due_string(t.get("dueDate")),
         "priority": _MOTION_PRI_OUT.get(pri_raw, "med"),
     }
 
