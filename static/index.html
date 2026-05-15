@@ -968,12 +968,12 @@ function renderClaude(p) {
 function renderSessions(p) {
   setMeta('sessions-meta', p);
   if (!p || p.status === 'pending') { setHtml('sessions-body', '<div class="dim">loading…</div>'); return; }
-  const s = p.cc_sessions || { live: 0, idle: 0 };
+  const s = p.cc_sessions || { live: 0, idle: 0, total_today: 0 };
   setHtml('sessions-body', `
     <div class="row"><span class="dim">LIVE</span><span class="accent blink-cursor">${s.live}</span></div>
     <div class="row"><span class="dim">IDLE</span><span>${s.idle}</span></div>
-    <div class="row"><span class="dim">TOTAL TODAY</span><span>${(s.live + s.idle) * 4 || '—'}</span></div>
-    <div class="panel-foot">scan ~/.claude/local-agent-mode-sessions</div>
+    <div class="row"><span class="dim">TOTAL TODAY</span><span>${s.total_today ?? '—'}</span></div>
+    <div class="panel-foot">scan ~/.claude/projects</div>
   `);
 }
 

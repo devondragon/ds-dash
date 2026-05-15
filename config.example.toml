@@ -37,6 +37,13 @@ poll_seconds = 60
 look_ahead_days = 1
 poll_seconds = 60
 
+[claude]
+# Approximate caps for the usage gauges. Not enforced — just denominators
+# for the percent bars. Tune to your plan if defaults feel off.
+five_h_limit = 200
+weekly_limit = 1500
+poll_seconds = 60
+
 # [gmail]
 # # OAuth credentials path (Google Cloud project)
 # credentials = "~/.cowork-dash/gmail-credentials.json"

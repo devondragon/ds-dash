@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import os
 import re
 import shutil
@@ -502,10 +503,151 @@ async def mock_tasks_poll() -> None:
         await asyncio.sleep(30)
 
 
-async def mock_claude_poll() -> None:
-    """Approximate Claude usage and CC session count. Real impl walks ~/.claude/."""
+# --------------------------------------------------------------------------- #
+# Claude usage + CC sessions (real — walks ~/.claude/projects)
+# --------------------------------------------------------------------------- #
+# Each .jsonl under ~/.claude/projects/<project>/ is one Claude Code session.
+# Lines with `type: 'user'` and an ISO `timestamp` represent user messages.
+# We approximate usage by counting user messages in 5h and 7d windows, and
+# classify sessions as live / idle by file mtime.
+
+CLAUDE_PROJECTS_ROOT = Path.home() / ".claude" / "projects"
+_DEFAULT_FIVE_H_LIMIT = 200    # approximate per-plan ceiling for the 5h gauge
+_DEFAULT_WEEKLY_LIMIT = 1500   # ditto for the 7d gauge
+
+
+def _scan_claude_data(five_h_limit: int, weekly_limit: int) -> dict:
+    """Walk ~/.claude/projects/**/*.jsonl, return usage + session stats.
+    Files older than the 7d cutoff are stat'd but not opened (cheap).
+    """
+    out = {
+        "five_pct": 0, "five_h_count": 0, "five_resets_at": "—",
+        "weekly_pct": 0, "weekly_count": 0, "weekly_resets_at": "—",
+        "cc_live": 0, "cc_idle": 0, "cc_today": 0,
+    }
+    if not CLAUDE_PROJECTS_ROOT.is_dir():
+        return out
+
+    now_utc = datetime.now(timezone.utc)
+    now_local = datetime.now()
+    cutoff_5h = now_utc - timedelta(hours=5)
+    cutoff_7d = now_utc - timedelta(days=7)
+    today_midnight_ts = now_local.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+    five_h_count = 0
+    weekly_count = 0
+    cc_live = cc_idle = cc_today = 0
+    oldest_in_5h: datetime | None = None
+    oldest_in_7d: datetime | None = None
+
+    for proj in CLAUDE_PROJECTS_ROOT.iterdir():
+        if not proj.is_dir():
+            continue
+        for f in proj.glob("*.jsonl"):
+            try:
+                mtime = f.stat().st_mtime
+            except OSError:
+                continue
+            age_s = now_utc.timestamp() - mtime
+            if age_s < 300:
+                cc_live += 1
+            elif age_s < 3600:
+                cc_idle += 1
+            if mtime >= today_midnight_ts:
+                cc_today += 1
+
+            # Skip full read for files outside the 7-day message window.
+            if mtime < cutoff_7d.timestamp():
+                continue
+            try:
+                with f.open(encoding="utf-8", errors="replace") as fp:
+                    for line in fp:
+                        # Cheap pre-filter; most lines aren't user messages.
+                        if '"type":"user"' not in line:
+                            continue
+                        try:
+                            d = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        if d.get("type") != "user":
+                            continue
+                        ts = d.get("timestamp")
+                        if not ts:
+                            continue
+                        try:
+                            msg_dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                        except ValueError:
+                            continue
+                        if msg_dt >= cutoff_5h:
+                            five_h_count += 1
+                            if oldest_in_5h is None or msg_dt < oldest_in_5h:
+                                oldest_in_5h = msg_dt
+                        if msg_dt >= cutoff_7d:
+                            weekly_count += 1
+                            if oldest_in_7d is None or msg_dt < oldest_in_7d:
+                                oldest_in_7d = msg_dt
+            except OSError:
+                continue
+
+    out["five_h_count"] = five_h_count
+    out["weekly_count"] = weekly_count
+    out["five_pct"] = min(100, int(round(100 * five_h_count / five_h_limit))) if five_h_limit else 0
+    out["weekly_pct"] = min(100, int(round(100 * weekly_count / weekly_limit))) if weekly_limit else 0
+    out["cc_live"] = cc_live
+    out["cc_idle"] = cc_idle
+    out["cc_today"] = cc_today
+
+    # "Resets at" — when the oldest message in the window slides out of it.
+    if oldest_in_5h:
+        out["five_resets_at"] = (oldest_in_5h + timedelta(hours=5)).astimezone().strftime("%H:%M")
+    if oldest_in_7d:
+        out["weekly_resets_at"] = (oldest_in_7d + timedelta(days=7)).astimezone().strftime("%a %H:%M").upper()
+    return out
+
+
+async def claude_poll(
+    interval: int = 60,
+    five_h_limit: int = _DEFAULT_FIVE_H_LIMIT,
+    weekly_limit: int = _DEFAULT_WEEKLY_LIMIT,
+) -> None:
+    """Real provider — powers both CLAUDE USAGE and CC SESSIONS panels."""
     while True:
-        # Slowly drift the percentages so the bars feel alive on screen.
+        try:
+            stats = _scan_claude_data(five_h_limit, weekly_limit)
+            STATE["providers"]["claude"] = {
+                "status": "ok",
+                "updated_at": _now_iso(),
+                "five_hour": {
+                    "percent": stats["five_pct"],
+                    "count": stats["five_h_count"],
+                    "limit": five_h_limit,
+                    "resets_at": stats["five_resets_at"],
+                },
+                "weekly": {
+                    "percent": stats["weekly_pct"],
+                    "count": stats["weekly_count"],
+                    "limit": weekly_limit,
+                    "resets_at": stats["weekly_resets_at"],
+                },
+                "cc_sessions": {
+                    "live": stats["cc_live"],
+                    "idle": stats["cc_idle"],
+                    "total_today": stats["cc_today"],
+                },
+            }
+        except Exception as e:
+            STATE["providers"]["claude"] = {
+                "status": "error",
+                "error": f"{type(e).__name__}: {e}",
+                "updated_at": _now_iso(),
+            }
+        await asyncio.sleep(interval)
+
+
+# Legacy mock kept for reference; not started by lifespan.
+async def mock_claude_poll() -> None:
+    """Original drift mock — superseded by claude_poll."""
+    while True:
         five = 60 + int(20 * abs(_sin_seconds(0.001)))
         weekly = 45 + int(15 * abs(_sin_seconds(0.0003, phase=1.0)))
         STATE["providers"]["claude"] = {
@@ -659,7 +801,13 @@ async def lifespan(_app: FastAPI):
             "message": "Add [motion] api_key to ~/.cowork-dash/config.toml",
         }
 
-    BACKGROUND_TASKS.append(asyncio.create_task(mock_claude_poll()))
+    cl = cfg.get("claude") or {}
+    BACKGROUND_TASKS.append(asyncio.create_task(claude_poll(
+        interval=cl.get("poll_seconds", 60),
+        five_h_limit=cl.get("five_h_limit", _DEFAULT_FIVE_H_LIMIT),
+        weekly_limit=cl.get("weekly_limit", _DEFAULT_WEEKLY_LIMIT),
+    )))
+    _push_ticker("daemon", "claude provider online", "info")
     sysc = cfg.get("system") or {}
     BACKGROUND_TASKS.append(asyncio.create_task(system_poll(sysc.get("poll_seconds", 5))))
     BACKGROUND_TASKS.append(asyncio.create_task(services_poll()))
