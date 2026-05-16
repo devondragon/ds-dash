@@ -431,13 +431,17 @@
     color: var(--dim);
     border-right: 1px solid var(--rule);
     user-select: none;
+    cursor: pointer;
+    transition: color 0.12s, background 0.12s;
   }
+  .panel-tabs .tab:hover { color: var(--cyan); }
   .panel-tabs .tab.active {
     color: var(--amber);
     background: rgba(255, 170, 68, 0.07);
     box-shadow: inset 0 -1px 0 var(--amber);
   }
-  .panel-tabs .tab.dead { color: var(--primary-deep); opacity: 0.65; }
+  .panel-tabs .tab.dead { color: var(--primary-deep); opacity: 0.65; cursor: default; }
+  .panel-tabs .tab.dead:hover { color: var(--primary-deep); }
 
   .panel-body { padding: 10px 14px 14px; }
   .panel-body .panel-title {
@@ -832,11 +836,11 @@
     <!-- RIGHT COL: GitHub, Heatmap -->
     <div class="col">
       <div class="panel panel-nightops" id="panel-github">
-        <div class="panel-tabs">
-          <span class="tab active">OVERVIEW</span>
-          <span class="tab dead">PRS</span>
-          <span class="tab dead">ISSUES</span>
-          <span class="tab dead">ACTIVITY</span>
+        <div class="panel-tabs" id="github-tabs">
+          <span class="tab active" data-tab="overview">OVERVIEW</span>
+          <span class="tab" data-tab="prs">PRS</span>
+          <span class="tab" data-tab="issues">ISSUES</span>
+          <span class="tab" data-tab="activity">ACTIVITY</span>
         </div>
         <div class="panel-body">
           <div class="panel-title">
@@ -1200,7 +1204,79 @@ function renderLinearPanel(label, safe, p) {
   setHtml(bodyId, html);
 }
 
+let githubTab = 'overview';
+let githubLast = null;
+
+function ghPrList(items, emptyMsg) {
+  if (!items || !items.length) return `<div class="dim" style="margin-top:6px">${emptyMsg}</div>`;
+  return items.map(pr => `
+    <div class="pr-item">
+      <span class="pr-title">#${pr.number} ${escapeHtml(pr.title)}${pr.draft ? ' <span class="dim" style="font-size:10px">[draft]</span>' : ''}</span>
+      <span class="pr-repo">${escapeHtml(pr.repo || '')}</span>
+    </div>
+  `).join('');
+}
+
+function ghIssueList(items, emptyMsg) {
+  if (!items || !items.length) return `<div class="dim" style="margin-top:6px">${emptyMsg}</div>`;
+  return items.map(i => `
+    <div class="pr-item">
+      <span class="pr-title">#${i.number} ${escapeHtml(i.title)}</span>
+      <span class="pr-repo">${escapeHtml(i.repo || '')}</span>
+    </div>
+  `).join('');
+}
+
+function ghActivityList(items) {
+  if (!items || !items.length) return '<div class="dim" style="margin-top:6px">no recent activity</div>';
+  return items.map(ev => `
+    <div class="pr-item">
+      <span class="pr-title"><span class="dim" style="font-size:10px">[${escapeHtml(ev.kind || '?')}]</span> ${escapeHtml(ev.detail || '')}</span>
+      <span class="pr-repo">${escapeHtml(ev.repo || '')} · ${timeAgo(ev.at)}</span>
+    </div>
+  `).join('');
+}
+
+function renderGithubView(p) {
+  const rr = p.review_requested || { count: 0, items: [] };
+  const my = p.my_open_prs || { count: 0, items: [] };
+  const ia = p.issues_assigned || { count: 0, items: [] };
+  const ev = p.recent_events || { items: [] };
+  const today = p.commits_today ?? 0;
+
+  if (githubTab === 'prs') {
+    return `
+      <div class="row"><span class="dim">Awaiting my review</span><span class="${rr.count > 0 ? 'warn' : 'ok'}">${rr.count}</span></div>
+      ${ghPrList(rr.items, 'queue is clear')}
+      <div class="row" style="margin-top:8px"><span class="dim">My open PRs</span><span>${my.count}</span></div>
+      ${ghPrList(my.items, 'no open PRs')}
+    `;
+  }
+  if (githubTab === 'issues') {
+    return `
+      <div class="row"><span class="dim">Assigned to me</span><span class="${ia.count > 0 ? 'warn' : 'ok'}">${ia.count}</span></div>
+      ${ghIssueList(ia.items, 'no assigned issues')}
+    `;
+  }
+  if (githubTab === 'activity') {
+    return ghActivityList(ev.items);
+  }
+  // overview
+  let prList = '';
+  if (rr.items && rr.items.length) {
+    prList = '<div class="dim" style="margin-top:6px;font-size:11px">REVIEW REQUESTED</div>' + ghPrList(rr.items, '');
+  }
+  return `
+    <div class="row"><span class="dim">PRs awaiting review</span><span class="${rr.count > 0 ? 'warn' : 'ok'}">${rr.count}</span></div>
+    <div class="row"><span class="dim">PRs mine open</span><span>${my.count}</span></div>
+    <div class="row"><span class="dim">Issues assigned</span><span>${ia.count}</span></div>
+    <div class="row"><span class="dim">Commits today</span><span class="ok">${today}</span></div>
+    ${prList}
+  `;
+}
+
 function renderGithub(p) {
+  githubLast = p;
   setMeta('github-meta', p);
   if (!p) { setHtml('github-body', '<div class="dim">loading…</div>'); return; }
   if (p.status === 'unconfigured') {
@@ -1212,28 +1288,23 @@ function renderGithub(p) {
     return;
   }
   el('github-meta').textContent = '@' + (p.username || '—');
-  const rr = p.review_requested || { count: 0, items: [] };
-  const my = p.my_open_prs || { count: 0 };
-  const ia = p.issues_assigned || { count: 0 };
-  const today = p.commits_today ?? 0;
-
-  let prList = '';
-  if (rr.items && rr.items.length) {
-    prList = '<div class="dim" style="margin-top:6px;font-size:11px">REVIEW REQUESTED</div>' + rr.items.map(pr => `
-      <div class="pr-item">
-        <span class="pr-title">#${pr.number} ${escapeHtml(pr.title)}</span>
-        <span class="pr-repo">${escapeHtml(pr.repo || '')}</span>
-      </div>
-    `).join('');
-  }
-  setHtml('github-body', `
-    <div class="row"><span class="dim">PRs awaiting review</span><span class="${rr.count > 0 ? 'warn' : 'ok'}">${rr.count}</span></div>
-    <div class="row"><span class="dim">PRs mine open</span><span>${my.count}</span></div>
-    <div class="row"><span class="dim">Issues assigned</span><span>${ia.count}</span></div>
-    <div class="row"><span class="dim">Commits today</span><span class="ok">${today}</span></div>
-    ${prList}
-  `);
+  setHtml('github-body', renderGithubView(p));
 }
+
+// Wire tab clicks once on load.
+(function initGithubTabs() {
+  const tabs = document.getElementById('github-tabs');
+  if (!tabs) return;
+  tabs.addEventListener('click', (e) => {
+    const t = e.target.closest('.tab');
+    if (!t || t.classList.contains('dead')) return;
+    const name = t.dataset.tab;
+    if (!name || name === githubTab) return;
+    githubTab = name;
+    tabs.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x.dataset.tab === name));
+    if (githubLast) renderGithub(githubLast);
+  });
+})();
 
 function renderHeatmap(p) {
   setMeta('heatmap-meta', p);

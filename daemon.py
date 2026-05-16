@@ -142,18 +142,55 @@ async def github_poll(token: str, username: str, interval: int) -> None:
                 # PRs I authored, still open
                 r2 = await c.get(
                     f"{GITHUB_API}/search/issues",
-                    params={"q": f"is:open is:pr author:{username} archived:false", "per_page": 1},
+                    params={"q": f"is:open is:pr author:{username} archived:false", "per_page": 10},
                 )
                 r2.raise_for_status()
-                result["my_open_prs"] = {"count": r2.json().get("total_count", 0)}
+                d2 = r2.json()
+                result["my_open_prs"] = {
+                    "count": d2.get("total_count", 0),
+                    "items": [
+                        {
+                            "title": i["title"],
+                            "url": i["html_url"],
+                            "repo": _repo_short(i.get("repository_url", "")),
+                            "updated_at": i["updated_at"],
+                            "number": i.get("number"),
+                            "draft": i.get("draft", False),
+                        }
+                        for i in d2.get("items", [])[:6]
+                    ],
+                }
 
                 # Issues assigned to me
                 r3 = await c.get(
                     f"{GITHUB_API}/search/issues",
-                    params={"q": f"is:open is:issue assignee:{username} archived:false", "per_page": 1},
+                    params={"q": f"is:open is:issue assignee:{username} archived:false", "per_page": 10},
                 )
                 r3.raise_for_status()
-                result["issues_assigned"] = {"count": r3.json().get("total_count", 0)}
+                d3 = r3.json()
+                result["issues_assigned"] = {
+                    "count": d3.get("total_count", 0),
+                    "items": [
+                        {
+                            "title": i["title"],
+                            "url": i["html_url"],
+                            "repo": _repo_short(i.get("repository_url", "")),
+                            "updated_at": i["updated_at"],
+                            "number": i.get("number"),
+                        }
+                        for i in d3.get("items", [])[:6]
+                    ],
+                }
+
+                # Recent public events (for ACTIVITY tab)
+                r5 = await c.get(
+                    f"{GITHUB_API}/users/{username}/events",
+                    params={"per_page": 12},
+                )
+                r5.raise_for_status()
+                result["recent_events"] = {
+                    "items": [_summarize_event(e) for e in r5.json()[:10] if _summarize_event(e)],
+                }
 
                 # Contribution heatmap via GraphQL
                 r4 = await c.post(
@@ -206,6 +243,50 @@ def _repo_short(repo_url: str) -> str:
     if len(parts) >= 2:
         return "/".join(parts[-2:])
     return repo_url
+
+
+def _summarize_event(e: dict) -> dict | None:
+    """Reduce a /users/{u}/events payload entry to {kind, repo, detail, at}."""
+    t = e.get("type") or ""
+    repo = (e.get("repo") or {}).get("name") or ""
+    payload = e.get("payload") or {}
+    at = e.get("created_at") or ""
+    kind = t.replace("Event", "").lower() if t.endswith("Event") else t.lower()
+    detail = ""
+    if t == "PushEvent":
+        n = payload.get("size") or len(payload.get("commits") or [])
+        branch = (payload.get("ref") or "").rsplit("/", 1)[-1]
+        detail = f"{n} commit{'s' if n != 1 else ''} → {branch}" if branch else f"{n} commits"
+    elif t == "PullRequestEvent":
+        pr = payload.get("pull_request") or {}
+        detail = f"{payload.get('action', '?')} PR #{pr.get('number', '?')} {pr.get('title') or ''}"
+    elif t == "PullRequestReviewEvent":
+        pr = payload.get("pull_request") or {}
+        detail = f"reviewed PR #{pr.get('number', '?')} {pr.get('title') or ''}"
+    elif t == "IssuesEvent":
+        iss = payload.get("issue") or {}
+        detail = f"{payload.get('action', '?')} #{iss.get('number', '?')} {iss.get('title') or ''}"
+    elif t == "IssueCommentEvent":
+        iss = payload.get("issue") or {}
+        detail = f"comment on #{iss.get('number', '?')} {iss.get('title') or ''}"
+    elif t == "CreateEvent":
+        detail = f"created {payload.get('ref_type', '')} {payload.get('ref') or ''}".strip()
+    elif t == "DeleteEvent":
+        detail = f"deleted {payload.get('ref_type', '')} {payload.get('ref') or ''}".strip()
+    elif t == "ForkEvent":
+        detail = "forked"
+    elif t == "WatchEvent":
+        detail = "starred"
+    elif t == "ReleaseEvent":
+        rel = payload.get("release") or {}
+        detail = f"{payload.get('action', '?')} release {rel.get('tag_name') or ''}"
+    elif t == "PublicEvent":
+        detail = "made public"
+    elif t:
+        detail = t
+    else:
+        return None
+    return {"kind": kind, "repo": repo, "detail": detail.strip(), "at": at}
 
 
 # --------------------------------------------------------------------------- #
