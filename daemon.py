@@ -513,14 +513,16 @@ async def mock_tasks_poll() -> None:
 # Linear provider (real — api.linear.app GraphQL)
 # --------------------------------------------------------------------------- #
 # One coroutine per workspace. Each writes to STATE["providers"]["linear"][label].
-# Combined GraphQL query: viewer.assignedIssues + cycles(isActive). The assigned
-# filter is intentionally NOT applied server-side so we can detect transitions
-# *into* completed/canceled before client-side filtering hides those issues.
+# Combined GraphQL query: viewer.assignedIssues (server-filtered by state.type
+# to the workspace's show_state_types) + cycles(isActive).
 
 LINEAR_API = "https://api.linear.app/graphql"
 _LINEAR_MAX_ITEMS = 8           # how many issues we render per panel
 _LINEAR_MIN_INTERVAL = 60        # floor for poll_seconds
 _LINEAR_DEFAULT_INTERVAL = 90
+# Default visible states. Linear's WorkflowState.type enum values:
+# backlog | unstarted | started | completed | canceled
+_LINEAR_DEFAULT_STATE_TYPES = ["backlog", "unstarted", "started"]
 
 # Linear priority int -> (sort rank, frontend bucket).
 # Rank distinguishes urgent (1) from high (2) for sort order; the OUT bucket collapses both to "high" for display.
@@ -528,11 +530,15 @@ _LINEAR_PRI_RANK = {1: 0, 2: 1, 3: 2, 4: 3, 0: 4}
 _LINEAR_PRI_OUT  = {1: "high", 2: "high", 3: "med", 4: "low", 0: "none"}
 
 LINEAR_GQL = """
-query DashboardSnapshot {
+query DashboardSnapshot($stateTypes: [String!]) {
   viewer {
     id
     name
-    assignedIssues(first: 50, orderBy: updatedAt) {
+    assignedIssues(
+      first: 50
+      orderBy: updatedAt
+      filter: { state: { type: { in: $stateTypes } } }
+    ) {
       nodes {
         id
         identifier
@@ -637,19 +643,20 @@ def _linear_active_cycle(nodes: list[dict]) -> dict:
     }
 
 
-async def linear_poll(label: str, api_key: str, interval: int) -> None:
+async def linear_poll(label: str, api_key: str, interval: int, state_types: list[str]) -> None:
     headers = {
         "Authorization": api_key,            # personal keys: NO "Bearer " prefix
         "Content-Type": "application/json",
         "User-Agent": "cowork-dash/0.1",
     }
+    variables = {"stateTypes": state_types}
     prev_ids: set[str] = set()
     prev_states: dict[str, str] = {}
     first_poll = True
     while True:
         try:
             async with httpx.AsyncClient(timeout=20, headers=headers) as c:
-                r = await c.post(LINEAR_API, json={"query": LINEAR_GQL})
+                r = await c.post(LINEAR_API, json={"query": LINEAR_GQL, "variables": variables})
                 r.raise_for_status()
                 payload = r.json()
 
@@ -698,14 +705,10 @@ async def linear_poll(label: str, api_key: str, interval: int) -> None:
             prev_ids = cur_ids
             prev_states = cur_states
             first_poll = False
-            visible = [
-                it for it in shaped_all
-                if it["state_type"] not in ("completed", "canceled")
-            ]
-            visible.sort(key=_linear_sort_key)
-            open_count = len(visible)
+            shaped_all.sort(key=_linear_sort_key)
+            open_count = len(shaped_all)
             items = []
-            for it in visible[:_LINEAR_MAX_ITEMS]:
+            for it in shaped_all[:_LINEAR_MAX_ITEMS]:
                 items.append({k: v for k, v in it.items() if not k.startswith("_")})
 
             STATE["providers"]["linear"][label] = {
@@ -1053,7 +1056,8 @@ async def lifespan(_app: FastAPI):
         seen_labels.add(label)
         STATE["providers"]["linear"][label] = {"status": "pending"}
         interval = max(_LINEAR_MIN_INTERVAL, block.get("poll_seconds", _LINEAR_DEFAULT_INTERVAL))
-        BACKGROUND_TASKS.append(asyncio.create_task(linear_poll(label, api_key, interval)))
+        state_types = block.get("show_state_types") or _LINEAR_DEFAULT_STATE_TYPES
+        BACKGROUND_TASKS.append(asyncio.create_task(linear_poll(label, api_key, interval, state_types)))
         _push_ticker("daemon", f"linear provider online ({label})", "info")
         started_any = True
 

@@ -29,6 +29,10 @@ poll_seconds = 180
 # label = "WORK"             # short, all-caps; shown as "LINEAR · WORK" panel title
 # api_key = "lin_api_..."
 # poll_seconds = 90          # default 90; minimum enforced at 60
+# # Which Linear WorkflowState types to show. Default below = the three open
+# # types. Add "completed" to include Done, "canceled" to include Cancelled.
+# # Server-side filter, so excluded states cost no bandwidth.
+# show_state_types = ["backlog", "unstarted", "started"]
 #
 # [[linear]]
 # label = "PERSONAL"
