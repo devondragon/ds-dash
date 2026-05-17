@@ -184,9 +184,10 @@ Neue + IBM Plex Mono.
 
 ### Layout
 
-- **Header strip** — REC pulse · `OPERATOR://DEVON [ON STATION]` · gold
+- **Header strip** — REC pulse · `OPERATOR://<NAME> [ON STATION]` · gold
   Bebas Neue timecode · CPU/MEM/UPTIME chip · 60×12 net sparkline ·
-  weather.
+  weather. The operator label is read from `state.meta.operator`, which the
+  daemon populates from `[ui].operator_name` (config) or `$USER`.
 - **3-column grid** of panels — left: Services/Claude/CC sessions ·
   center: Calendar/Tasks · right: GitHub/Heatmap.
 - **Ticker** along the bottom — scrolling rolling events.

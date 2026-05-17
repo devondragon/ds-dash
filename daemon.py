@@ -51,6 +51,11 @@ STATIC_DIR = Path(__file__).parent / "static"
 # updated_at}. The frontend tolerates missing fields.
 STATE: dict[str, Any] = {
     "started_at": datetime.now(timezone.utc).isoformat(),
+    "meta": {
+        # Operator label shown in the header. Populated at startup from
+        # [ui].operator_name in config, with $USER as the fallback.
+        "operator": "OPERATOR",
+    },
     "providers": {
         "github": {"status": "pending"},
         "calendar": {"status": "pending"},
@@ -1306,6 +1311,10 @@ BACKGROUND_TASKS: list[asyncio.Task] = []
 @contextlib.asynccontextmanager
 async def lifespan(_app: FastAPI):
     cfg = load_config()
+
+    ui = cfg.get("ui") or {}
+    operator = ui.get("operator_name") or os.environ.get("USER") or "OPERATOR"
+    STATE["meta"]["operator"] = str(operator).upper()
 
     gh = cfg.get("github") or {}
     if gh.get("token") and gh.get("username") and gh["token"] != "ghp_replace_me":

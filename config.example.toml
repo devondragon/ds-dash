@@ -5,6 +5,11 @@
 # Port the daemon listens on. Open http://localhost:PORT in any browser tab.
 port = 7766
 
+[ui]
+# Label shown in the header strip ("OPERATOR://NAME"). If unset, falls back
+# to the $USER environment variable (uppercased). Set to your handle/callsign.
+# operator_name = "your_name"
+
 [github]
 # Create a fine-grained personal access token at:
 #   https://github.com/settings/tokens?type=beta

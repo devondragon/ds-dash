@@ -1253,7 +1253,7 @@
   <div class="hdr">
     <div class="left">
       <span class="rec-dot"></span>
-      <span class="op-prefix">OPERATOR://</span><span class="op-name">DEVON</span>
+      <span class="op-prefix">OPERATOR://</span><span class="op-name" id="opname">—</span>
       <span class="op-status" id="connection">ON STATION</span>
       <span class="theme-chip" id="theme-chip" title="Click or press T to cycle themes">
         <span class="label">THEME</span><span id="theme-name">NIGHTOPS</span>
@@ -2184,6 +2184,9 @@ async function poll() {
     const s = await r.json();
     document.body.classList.remove('offline');
     el('connection').textContent = 'ON STATION';
+
+    const op = (s.meta && s.meta.operator) || 'OPERATOR';
+    if (el('opname').textContent !== op) el('opname').textContent = op;
 
     const p = s.providers || {};
     renderServices(p.services);
