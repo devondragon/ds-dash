@@ -1034,10 +1034,10 @@ async def system_poll(interval: int = 5) -> None:
 async def services_poll(interval: int = 300) -> None:
     """Polls public status pages (no auth required)."""
     endpoints = {
-        "anthropic": "https://status.anthropic.com/api/v2/summary.json",
+        "anthropic": "https://status.claude.com/api/v2/summary.json",
         "openai":    "https://status.openai.com/api/v2/summary.json",
         "github":    "https://www.githubstatus.com/api/v2/summary.json",
-        "linear":    "https://status.linear.app/api/v2/summary.json",
+        "linear":    "https://linearstatus.com/api/v2/summary.json",
         "vercel":    "https://www.vercel-status.com/api/v2/summary.json",
     }
     while True:
