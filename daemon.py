@@ -995,6 +995,29 @@ async def mock_claude_poll() -> None:
 NET_HISTORY_SIZE = 60  # 60 samples * 5s = 5min of net trace at the default poll interval
 
 
+def _top_processes(n: int = 3) -> tuple[list[dict], list[dict]]:
+    """Return (top_n_by_cpu, top_n_by_mem). CPU values are percent-of-one-core
+    summed across threads, so an N-core machine can show values up to N*100.
+    Memory is percent of physical RAM. Processes we can't read (zombies,
+    System-protected) are skipped silently."""
+    rows: list[dict] = []
+    for p in psutil.process_iter(["pid", "name"]):
+        try:
+            cpu = p.cpu_percent(interval=None)
+            mem = p.memory_percent()
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
+        rows.append({
+            "pid": p.info.get("pid"),
+            "name": (p.info.get("name") or "?")[:40],
+            "cpu": round(cpu, 1),
+            "mem": round(mem, 1),
+        })
+    top_cpu = sorted(rows, key=lambda r: r["cpu"], reverse=True)[:n]
+    top_mem = sorted(rows, key=lambda r: r["mem"], reverse=True)[:n]
+    return top_cpu, top_mem
+
+
 async def system_poll(interval: int = 5) -> None:
     """System stats via psutil. Network rates are computed between polls."""
     host = socket.gethostname().split(".")[0]
@@ -1005,6 +1028,13 @@ async def system_poll(interval: int = 5) -> None:
 
     # Prime cpu_percent so the first real value isn't 0.0
     psutil.cpu_percent(interval=None)
+    # Prime per-process CPU counters too so the first sampled poll has real values
+    # rather than zeros for every PID.
+    for _p in psutil.process_iter():
+        try:
+            _p.cpu_percent(interval=None)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
     prev_net = psutil.net_io_counters()
     prev_ts = time.monotonic()
     history: list[dict] = []
@@ -1026,6 +1056,8 @@ async def system_poll(interval: int = 5) -> None:
             hours, rem = divmod(rem, 3600)
             mins = rem // 60
 
+            top_cpu, top_mem = _top_processes()
+
             STATE["providers"]["system"] = {
                 "status": "ok",
                 "updated_at": _now_iso(),
@@ -1037,6 +1069,8 @@ async def system_poll(interval: int = 5) -> None:
                 "net_history": list(history),  # snapshot — frontend reads, backend keeps mutating
                 "uptime": f"{days}d {hours:02d}h {mins:02d}m",
                 "host": host,
+                "top_cpu": top_cpu,
+                "top_mem": top_mem,
             }
         except Exception as e:
             STATE["providers"]["system"] = {
