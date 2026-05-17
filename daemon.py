@@ -56,6 +56,7 @@ STATE: dict[str, Any] = {
         "claude": {"status": "pending"},
         "services": {"status": "pending"},
         "system": {"status": "pending"},
+        "network": {"status": "pending"},
         "linear": {},   # populated per-workspace at startup; sentinel set if unconfigured
     },
     "ticker": [],  # list of {ts, source, text, level}
@@ -1111,6 +1112,105 @@ async def services_poll(interval: int = 300) -> None:
         await asyncio.sleep(interval)
 
 
+_VPN_IFACE_RE = re.compile(r"^(utun|ipsec|wg|tun|tap|ppp)\d*$")
+
+
+def _detect_vpn_interfaces() -> list[dict]:
+    """Inspect local interfaces for likely VPN tunnels. Heuristic: any
+    utun*/ipsec*/wg*/tun*/tap*/ppp* that's up AND has a non-link-local IPv4
+    address. macOS uses several utun interfaces for Continuity/AirPlay even
+    without a VPN, so we additionally require an IPv4 — those Apple services
+    don't bind one.
+    """
+    found: list[dict] = []
+    try:
+        addrs = psutil.net_if_addrs()
+        stats = psutil.net_if_stats()
+    except Exception:
+        return found
+    for iface, ifaddrs in addrs.items():
+        if not _VPN_IFACE_RE.match(iface):
+            continue
+        if iface not in stats or not stats[iface].isup:
+            continue
+        for a in ifaddrs:
+            # AF_INET == 2 across platforms; comparing the family int avoids
+            # importing socket constants here.
+            if a.family != socket.AF_INET:
+                continue
+            ip = a.address or ""
+            if not ip or ip.startswith("169.254."):
+                continue
+            found.append({"iface": iface, "ip": ip})
+            break
+    return found
+
+
+async def network_poll(token: str | None = None, interval: int = 300) -> None:
+    """Poll public IP / ISP / region via ipinfo.io and inspect local
+    interfaces for VPN tunnels. ipinfo.io's free tier (no token) is ~1k/day
+    and returns ip, city, region, country, org. A token raises the limit
+    and adds optional fields.
+    """
+    url = "https://ipinfo.io/json"
+    headers = {"User-Agent": "cowork-dash/0.1", "Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    prev_wan: str | None = None
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=15, headers=headers) as c:
+                r = await c.get(url)
+                r.raise_for_status()
+                data = r.json()
+            wan_ip = data.get("ip") or ""
+            org = data.get("org") or ""
+            # ipinfo returns "AS1234 ISP Name"; split out the AS for compactness
+            asn = ""
+            isp = org
+            if org and org.startswith("AS"):
+                parts = org.split(" ", 1)
+                if len(parts) == 2:
+                    asn, isp = parts
+            region_bits = [data.get("city"), data.get("region"), data.get("country")]
+            region = ", ".join(b for b in region_bits if b)
+            vpn_ifaces = _detect_vpn_interfaces()
+
+            if prev_wan and wan_ip and wan_ip != prev_wan:
+                _push_ticker("network", f"WAN ip changed {prev_wan} → {wan_ip}", "warn")
+            prev_wan = wan_ip or prev_wan
+
+            STATE["providers"]["network"] = {
+                "status": "ok",
+                "updated_at": _now_iso(),
+                "wan_ip": wan_ip,
+                "asn": asn,
+                "isp": isp,
+                "region": region,
+                "vpn_active": bool(vpn_ifaces),
+                "vpn_ifaces": vpn_ifaces,
+            }
+        except httpx.HTTPStatusError as e:
+            # Even if ipinfo fails (rate-limit, offline), local VPN detection
+            # still works — surface that and report the error separately.
+            STATE["providers"]["network"] = {
+                "status": "error",
+                "updated_at": _now_iso(),
+                "error": f"HTTP {e.response.status_code}: {e.response.text[:120]}",
+                "vpn_active": bool(_detect_vpn_interfaces()),
+                "vpn_ifaces": _detect_vpn_interfaces(),
+            }
+        except Exception as e:
+            STATE["providers"]["network"] = {
+                "status": "error",
+                "updated_at": _now_iso(),
+                "error": f"{type(e).__name__}: {e}",
+                "vpn_active": bool(_detect_vpn_interfaces()),
+                "vpn_ifaces": _detect_vpn_interfaces(),
+            }
+        await asyncio.sleep(interval)
+
+
 def _sin_seconds(rate: float, phase: float = 0.0) -> float:
     """Smooth oscillator based on wall clock. Used by mock providers."""
     return math.sin(datetime.now().timestamp() * rate + phase)
@@ -1208,6 +1308,12 @@ async def lifespan(_app: FastAPI):
     sysc = cfg.get("system") or {}
     BACKGROUND_TASKS.append(asyncio.create_task(system_poll(sysc.get("poll_seconds", 5))))
     BACKGROUND_TASKS.append(asyncio.create_task(services_poll()))
+
+    netc = cfg.get("network") or {}
+    BACKGROUND_TASKS.append(asyncio.create_task(
+        network_poll(netc.get("ipinfo_token"), netc.get("poll_seconds", 300))
+    ))
+    _push_ticker("daemon", "network provider online", "info")
 
     _push_ticker("daemon", "cowork-dash online", "info")
 

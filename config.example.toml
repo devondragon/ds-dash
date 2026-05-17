@@ -66,6 +66,13 @@ poll_seconds = 60
 [system]
 poll_seconds = 5
 
+[network]
+# WAN IP / ISP / region come from ipinfo.io. The free tier (no token) allows
+# ~1k requests/day; polling at 300s burns 288/day. Add a token at ipinfo.io
+# if you want more headroom or richer data.
+# ipinfo_token = "..."
+poll_seconds = 300
+
 # [claude_code]
 # # Directory to scan for active CC sessions
 # sessions_dir = "~/Library/Application Support/Claude/local-agent-mode-sessions"
