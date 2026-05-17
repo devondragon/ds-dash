@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import errno
 import json
 import math
 import os
@@ -444,11 +445,20 @@ async def calendar_poll(ical_buddy: str, look_ahead_days: int = 1, interval: int
             }
             return
         except OSError as e:
+            # Only bail permanently on errors that need user action (missing exec
+            # perms, wrong-arch binary). Transient OSErrors — EMFILE during sleep/wake,
+            # ENOMEM under pressure — fall through to retry on the next interval.
+            if e.errno in (errno.EACCES, errno.ENOEXEC):
+                STATE["providers"]["calendar"] = {
+                    "status": "unconfigured",
+                    "message": f"ical-buddy at {ical_buddy} can't exec ({e.strerror or e}). Reinstall: brew install ical-buddy",
+                }
+                return
             STATE["providers"]["calendar"] = {
-                "status": "unconfigured",
-                "message": f"ical-buddy at {ical_buddy} can't exec ({e}). Reinstall: brew install ical-buddy",
+                "status": "error",
+                "error": f"ical-buddy exec failed: {e.strerror or type(e).__name__} (errno {e.errno})",
+                "updated_at": _now_iso(),
             }
-            return
         except asyncio.TimeoutError:
             STATE["providers"]["calendar"] = {
                 "status": "error",
