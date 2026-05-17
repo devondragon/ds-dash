@@ -620,6 +620,24 @@
   .cal-row.now .when { color: var(--warn); }
   .cal-row.now .what { color: var(--warn); }
   .cal-row.next .when { color: var(--accent); }
+  .cal-day-sep {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin: var(--space-4) 0 var(--space-2);
+    color: var(--dim);
+    font-family: var(--mono);
+    font-size: var(--fs-2xs);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .cal-day-sep::before,
+  .cal-day-sep::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
 
   /* Heatmap */
   .heatmap {
@@ -1474,23 +1492,50 @@ function renderSessions(p) {
   `);
 }
 
+function localYMD(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function calDayLabel(dateStr, todayStr, tomorrowStr) {
+  if (dateStr === todayStr) return 'TODAY';
+  if (dateStr === tomorrowStr) return 'TOMORROW';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const dow = ['SUN','MON','TUE','WED','THU','FRI','SAT'][dt.getDay()];
+  const mon = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][dt.getMonth()];
+  return `${dow} · ${mon} ${d}`;
+}
 function renderCalendar(p) {
   setMeta('cal-meta', p);
   if (!p || p.status === 'pending') { setHtml('cal-body', '<div class="dim">loading…</div>'); return; }
   const events = p.events || [];
   if (!events.length) { setHtml('cal-body', '<div class="dim">no events today</div>'); return; }
   el('cal-meta').textContent = events.length + ' EVENTS' + (p.status === 'mocked' ? ' · MOCK' : '');
-  const rows = events.map(ev => {
+  const now = new Date();
+  const todayStr = localYMD(now);
+  const tom = new Date(now); tom.setDate(tom.getDate() + 1);
+  const tomorrowStr = localYMD(tom);
+  const parts = [];
+  let prevDate = null;
+  for (const ev of events) {
+    if (ev.start_date && ev.start_date !== prevDate) {
+      // Suppress the leading "TODAY" header — the panel context implies it.
+      // Always emit a separator on day changes, and emit one before the first
+      // event when nothing is scheduled today (so the user sees the date jump).
+      if (!(prevDate === null && ev.start_date === todayStr)) {
+        parts.push(`<div class="cal-day-sep">${escapeHtml(calDayLabel(ev.start_date, todayStr, tomorrowStr))}</div>`);
+      }
+      prevDate = ev.start_date;
+    }
     let cls = '';
     if (ev.is_now) cls = 'now';
     else if (ev.is_next) cls = 'next';
     const marker = ev.is_now ? '▸ NOW' : (ev.is_next ? '  NEXT' : '     ');
-    return `<div class="cal-row ${cls}">
+    parts.push(`<div class="cal-row ${cls}">
       <span class="when">${escapeHtml(marker)}  ${escapeHtml(ev.start)}</span>
       <span class="what">${escapeHtml(ev.title)}</span>
-    </div>`;
-  }).join('');
-  setHtml('cal-body', rows);
+    </div>`);
+  }
+  setHtml('cal-body', parts.join(''));
 }
 
 function renderTasks(p) {
