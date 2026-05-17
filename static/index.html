@@ -1070,6 +1070,16 @@
     }
     .grid > .col:nth-child(3) > .panel { flex: 1; }
     .hdr .right { gap: var(--space-5); }
+
+    /* Cap rendered task rows per panel so dense Linear workspaces don't
+       crowd Tasks out of view. The .task class is shared by Tasks (Motion)
+       and every Linear panel body; the sibling chain matches the 6th .task
+       onward regardless of what non-.task siblings (e.g. cycle-strip)
+       precede, so the visible cap is 5. */
+    #tasks-body .task ~ .task ~ .task ~ .task ~ .task ~ .task,
+    [id^="linear-body-"] .task ~ .task ~ .task ~ .task ~ .task ~ .task {
+      display: none;
+    }
   }
 
   /* Tablet (≤1024px) — covers iPad mini/standard/Pro 11/13 portrait
@@ -1091,15 +1101,7 @@
     html, body { overflow: hidden auto; height: auto; min-height: 100dvh; }
     .grid { grid-template-columns: 1fr 1fr; }
     /* col 3 already spans full width via the ≤1400 rule; keep it row-flexed. */
-
-    /* Cap rendered task rows per panel so dense Linear workspaces don't
-       crowd Tasks out of view. The .task class is shared by Tasks (Motion)
-       and every Linear panel body. Sibling chain matches the (cap+1)th .task
-       onward regardless of what non-.task siblings (e.g. cycle-strip) precede. */
-    #tasks-body .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task,
-    [id^="linear-body-"] .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task {
-      display: none;
-    }
+    /* Task-row cap is inherited from the ≤1400 tier above (5 per panel). */
   }
 
   /* Mobile (≤640px) — single col, hide MOCK-only panels.
@@ -1118,12 +1120,7 @@
     .grid > .col:nth-child(3) { flex-direction: column; }
     #panel-sessions { display: none; }
     #weather, .hdr .right .sys, .sys-spark-wrap { display: none; }
-
-    /* Tighter row cap for mobile/quarter-screen viewports — 5 rows per panel. */
-    #tasks-body .task ~ .task ~ .task ~ .task ~ .task ~ .task,
-    [id^="linear-body-"] .task ~ .task ~ .task ~ .task ~ .task ~ .task {
-      display: none;
-    }
+    /* Task-row cap (5 per panel) is inherited from the ≤1400 tier above. */
   }
 
   /* Respect prefers-reduced-motion — kill infinite/large-motion animations
