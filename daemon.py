@@ -20,6 +20,7 @@ import os
 import re
 import shutil
 import socket
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone, timedelta
@@ -838,41 +839,139 @@ async def linear_poll(label: str, api_key: str, interval: int, state_types: list
 
 
 # --------------------------------------------------------------------------- #
-# Claude usage + CC sessions (real — walks ~/.claude/projects)
+# Claude usage + CC sessions
 # --------------------------------------------------------------------------- #
-# Each .jsonl under ~/.claude/projects/<project>/ is one Claude Code session.
-# Lines with `type: 'user'` and an ISO `timestamp` represent user messages.
-# We approximate usage by counting user messages in 5h and 7d windows, and
-# classify sessions as live / idle by file mtime.
+# Usage windows (5h / 7d utilization + reset timestamps) are pulled directly
+# from Anthropic's rate-limit response headers — the authoritative source.
+# We use Claude Code's OAuth credentials (already on disk after `claude login`)
+# to make a minimal Messages API request and read the
+# `anthropic-ratelimit-unified-{5h,7d}-{utilization,reset}` headers.
+#
+# Why not message-count the local jsonl files? Two reasons:
+#   1. Real usage is token-weighted by model — counting messages can't capture
+#      that an Opus turn costs ~5x a Sonnet turn for the same message.
+#   2. Real windows are anchored to the FIRST message of the window and reset
+#      atomically — they don't slide like a rolling-from-now window does.
+#
+# CC sessions (live/idle/today) still come from a local jsonl mtime scan;
+# those are local-only, free, and don't belong to Anthropic.
 
 CLAUDE_PROJECTS_ROOT = Path.home() / ".claude" / "projects"
-_DEFAULT_FIVE_H_LIMIT = 200    # approximate per-plan ceiling for the 5h gauge
-_DEFAULT_WEEKLY_LIMIT = 1500   # ditto for the 7d gauge
+_CLAUDE_USAGE_URL = "https://api.anthropic.com/v1/messages"
+# Cheapest valid probe: 1 Haiku token. Costs a fraction of a cent per poll.
+_CLAUDE_PROBE_MODEL = "claude-haiku-4-5-20251001"
+_CLAUDE_KEYCHAIN_SERVICE = "Claude Code-credentials"
 
 
-def _scan_claude_data(five_h_limit: int, weekly_limit: int) -> dict:
-    """Walk ~/.claude/projects/**/*.jsonl, return usage + session stats.
-    Files older than the 7d cutoff are stat'd but not opened (cheap).
+def _read_claude_oauth() -> dict | None:
+    """Read Claude Code's OAuth credentials from file or macOS keychain.
+
+    Returns {"access_token": str, "expires_at_ms": int | None} on success, or
+    None if no credentials are found. Raises on parse failure so the caller
+    can surface the underlying error.
     """
-    out = {
-        "five_pct": 0, "five_h_count": 0, "five_resets_at": "—",
-        "weekly_pct": 0, "weekly_count": 0, "weekly_resets_at": "—",
-        "cc_live": 0, "cc_idle": 0, "cc_today": 0,
+    raw: str | None = None
+    for f in (Path.home() / ".claude" / ".credentials.json",
+              Path.home() / ".claude" / "credentials.json"):
+        if f.is_file():
+            try:
+                raw = f.read_text(encoding="utf-8").strip()
+                if raw:
+                    break
+            except OSError:
+                continue
+
+    if not raw and sys.platform == "darwin":
+        try:
+            r = subprocess.run(
+                ["/usr/bin/security", "find-generic-password",
+                 "-s", _CLAUDE_KEYCHAIN_SERVICE,
+                 "-a", os.environ.get("USER", ""),
+                 "-w"],
+                capture_output=True, text=True, timeout=3,
+            )
+            if r.returncode == 0:
+                raw = r.stdout.strip()
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+    if not raw:
+        return None
+
+    data = json.loads(raw)
+    oa = data.get("claudeAiOauth") or {}
+    tok = oa.get("accessToken")
+    if not tok:
+        return None
+    return {"access_token": tok, "expires_at_ms": oa.get("expiresAt")}
+
+
+async def _fetch_claude_usage_headers(access_token: str) -> dict:
+    """POST a 1-token Messages request and parse usage from rate-limit headers.
+
+    Returns {five_pct, five_resets_at, weekly_pct, weekly_resets_at} where
+    percents are 0-100 ints and resets_at strings are formatted in local time.
+    """
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "anthropic-beta": "oauth-2025-04-20",
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
     }
+    body = {
+        "model": _CLAUDE_PROBE_MODEL,
+        "max_tokens": 1,
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+    async with httpx.AsyncClient(timeout=20) as c:
+        r = await c.post(_CLAUDE_USAGE_URL, headers=headers, json=body)
+        r.raise_for_status()
+
+    def _hf(name: str) -> float:
+        try:
+            return float(r.headers.get(name) or 0)
+        except ValueError:
+            return 0.0
+
+    now_ts = time.time()
+    five_util = _hf("anthropic-ratelimit-unified-5h-utilization")
+    five_reset = _hf("anthropic-ratelimit-unified-5h-reset")
+    week_util = _hf("anthropic-ratelimit-unified-7d-utilization")
+    week_reset = _hf("anthropic-ratelimit-unified-7d-reset")
+
+    # If a reset is already in the past, the server has rolled to a new window
+    # but the headers may briefly lag — treat utilization as 0 defensively.
+    if five_reset and five_reset < now_ts:
+        five_util = 0.0
+    if week_reset and week_reset < now_ts:
+        week_util = 0.0
+
+    return {
+        "five_pct": min(100, max(0, int(round(five_util * 100)))),
+        "five_resets_at": (
+            datetime.fromtimestamp(five_reset).astimezone().strftime("%H:%M")
+            if five_reset > 0 else "—"
+        ),
+        "weekly_pct": min(100, max(0, int(round(week_util * 100)))),
+        "weekly_resets_at": (
+            datetime.fromtimestamp(week_reset).astimezone().strftime("%a %H:%M").upper()
+            if week_reset > 0 else "—"
+        ),
+    }
+
+
+def _scan_cc_sessions() -> dict:
+    """Walk ~/.claude/projects/**/*.jsonl mtimes for live/idle/today counts.
+    Only stats files (no reads), so this is cheap even with hundreds of sessions.
+    """
+    out = {"cc_live": 0, "cc_idle": 0, "cc_today": 0}
     if not CLAUDE_PROJECTS_ROOT.is_dir():
         return out
 
-    now_utc = datetime.now(timezone.utc)
-    now_local = datetime.now()
-    cutoff_5h = now_utc - timedelta(hours=5)
-    cutoff_7d = now_utc - timedelta(days=7)
-    today_midnight_ts = now_local.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-
-    five_h_count = 0
-    weekly_count = 0
-    cc_live = cc_idle = cc_today = 0
-    oldest_in_5h: datetime | None = None
-    oldest_in_7d: datetime | None = None
+    now_ts = datetime.now(timezone.utc).timestamp()
+    today_midnight_ts = datetime.now().replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ).timestamp()
 
     for proj in CLAUDE_PROJECTS_ROOT.iterdir():
         if not proj.is_dir():
@@ -882,98 +981,78 @@ def _scan_claude_data(five_h_limit: int, weekly_limit: int) -> dict:
                 mtime = f.stat().st_mtime
             except OSError:
                 continue
-            age_s = now_utc.timestamp() - mtime
+            age_s = now_ts - mtime
             if age_s < 300:
-                cc_live += 1
+                out["cc_live"] += 1
             elif age_s < 3600:
-                cc_idle += 1
+                out["cc_idle"] += 1
             if mtime >= today_midnight_ts:
-                cc_today += 1
-
-            # Skip full read for files outside the 7-day message window.
-            if mtime < cutoff_7d.timestamp():
-                continue
-            try:
-                with f.open(encoding="utf-8", errors="replace") as fp:
-                    for line in fp:
-                        # Cheap pre-filter; most lines aren't user messages.
-                        if '"type":"user"' not in line:
-                            continue
-                        try:
-                            d = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        if d.get("type") != "user":
-                            continue
-                        ts = d.get("timestamp")
-                        if not ts:
-                            continue
-                        try:
-                            msg_dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                        except ValueError:
-                            continue
-                        if msg_dt >= cutoff_5h:
-                            five_h_count += 1
-                            if oldest_in_5h is None or msg_dt < oldest_in_5h:
-                                oldest_in_5h = msg_dt
-                        if msg_dt >= cutoff_7d:
-                            weekly_count += 1
-                            if oldest_in_7d is None or msg_dt < oldest_in_7d:
-                                oldest_in_7d = msg_dt
-            except OSError:
-                continue
-
-    out["five_h_count"] = five_h_count
-    out["weekly_count"] = weekly_count
-    out["five_pct"] = min(100, int(round(100 * five_h_count / five_h_limit))) if five_h_limit else 0
-    out["weekly_pct"] = min(100, int(round(100 * weekly_count / weekly_limit))) if weekly_limit else 0
-    out["cc_live"] = cc_live
-    out["cc_idle"] = cc_idle
-    out["cc_today"] = cc_today
-
-    # "Resets at" — when the oldest message in the window slides out of it.
-    if oldest_in_5h:
-        out["five_resets_at"] = (oldest_in_5h + timedelta(hours=5)).astimezone().strftime("%H:%M")
-    if oldest_in_7d:
-        out["weekly_resets_at"] = (oldest_in_7d + timedelta(days=7)).astimezone().strftime("%a %H:%M").upper()
+                out["cc_today"] += 1
     return out
 
 
-async def claude_poll(
-    interval: int = 60,
-    five_h_limit: int = _DEFAULT_FIVE_H_LIMIT,
-    weekly_limit: int = _DEFAULT_WEEKLY_LIMIT,
-) -> None:
-    """Real provider — powers both CLAUDE USAGE and CC SESSIONS panels."""
+def _cc_sessions_payload(sessions: dict) -> dict:
+    return {
+        "live": sessions["cc_live"],
+        "idle": sessions["cc_idle"],
+        "total_today": sessions["cc_today"],
+    }
+
+
+async def claude_poll(interval: int = 300) -> None:
+    """Real provider — powers both CLAUDE USAGE and CC SESSIONS panels.
+
+    Usage data comes from Anthropic's rate-limit response headers, polled
+    every `interval` seconds via a 1-token probe call. CC session counts
+    come from a local jsonl mtime scan and are always emitted (even on
+    usage-fetch failure) so that panel stays live.
+    """
     while True:
+        sessions = _scan_cc_sessions()
         try:
-            stats = _scan_claude_data(five_h_limit, weekly_limit)
+            creds = _read_claude_oauth()
+            if not creds:
+                STATE["providers"]["claude"] = {
+                    "status": "error",
+                    "error": "no Claude Code OAuth credentials found — run `claude` to authenticate",
+                    "updated_at": _now_iso(),
+                    "cc_sessions": _cc_sessions_payload(sessions),
+                }
+            elif creds.get("expires_at_ms") and creds["expires_at_ms"] / 1000 < time.time():
+                STATE["providers"]["claude"] = {
+                    "status": "error",
+                    "error": "Claude Code OAuth token expired — open `claude` to refresh",
+                    "updated_at": _now_iso(),
+                    "cc_sessions": _cc_sessions_payload(sessions),
+                }
+            else:
+                usage = await _fetch_claude_usage_headers(creds["access_token"])
+                STATE["providers"]["claude"] = {
+                    "status": "ok",
+                    "updated_at": _now_iso(),
+                    "five_hour": {
+                        "percent": usage["five_pct"],
+                        "resets_at": usage["five_resets_at"],
+                    },
+                    "weekly": {
+                        "percent": usage["weekly_pct"],
+                        "resets_at": usage["weekly_resets_at"],
+                    },
+                    "cc_sessions": _cc_sessions_payload(sessions),
+                }
+        except httpx.HTTPStatusError as e:
             STATE["providers"]["claude"] = {
-                "status": "ok",
+                "status": "error",
+                "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}",
                 "updated_at": _now_iso(),
-                "five_hour": {
-                    "percent": stats["five_pct"],
-                    "count": stats["five_h_count"],
-                    "limit": five_h_limit,
-                    "resets_at": stats["five_resets_at"],
-                },
-                "weekly": {
-                    "percent": stats["weekly_pct"],
-                    "count": stats["weekly_count"],
-                    "limit": weekly_limit,
-                    "resets_at": stats["weekly_resets_at"],
-                },
-                "cc_sessions": {
-                    "live": stats["cc_live"],
-                    "idle": stats["cc_idle"],
-                    "total_today": stats["cc_today"],
-                },
+                "cc_sessions": _cc_sessions_payload(sessions),
             }
         except Exception as e:
             STATE["providers"]["claude"] = {
                 "status": "error",
                 "error": f"{type(e).__name__}: {e}",
                 "updated_at": _now_iso(),
+                "cc_sessions": _cc_sessions_payload(sessions),
             }
         await asyncio.sleep(interval)
 
@@ -1301,9 +1380,7 @@ async def lifespan(_app: FastAPI):
 
     cl = cfg.get("claude") or {}
     BACKGROUND_TASKS.append(asyncio.create_task(claude_poll(
-        interval=cl.get("poll_seconds", 60),
-        five_h_limit=cl.get("five_h_limit", _DEFAULT_FIVE_H_LIMIT),
-        weekly_limit=cl.get("weekly_limit", _DEFAULT_WEEKLY_LIMIT),
+        interval=cl.get("poll_seconds", 300),
     )))
     _push_ticker("daemon", "claude provider online", "info")
     sysc = cfg.get("system") or {}

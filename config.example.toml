@@ -52,11 +52,13 @@ look_ahead_days = 1
 poll_seconds = 60
 
 [claude]
-# Approximate caps for the usage gauges. Not enforced — just denominators
-# for the percent bars. Tune to your plan if defaults feel off.
-five_h_limit = 200
-weekly_limit = 1500
-poll_seconds = 60
+# Pulls authoritative 5h/weekly utilization directly from Anthropic's
+# rate-limit response headers using your Claude Code OAuth credentials
+# (read from ~/.claude/.credentials.json or the macOS keychain item
+# "Claude Code-credentials" — same place `claude` itself reads them).
+# Each poll makes one 1-token Messages API request, so this also burns
+# a sliver of quota — keep the interval at minutes, not seconds.
+poll_seconds = 300
 
 # [gmail]
 # # OAuth credentials path (Google Cloud project)
