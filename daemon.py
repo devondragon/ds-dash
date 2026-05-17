@@ -511,11 +511,17 @@ def _motion_sort_key(t: dict) -> tuple:
 
 def _motion_to_item(t: dict) -> dict:
     pri_raw = (t.get("priority") or "MEDIUM").upper()
+    task_id = t.get("id") or ""
+    # Motion's web app deep-links use ?task=<id>. On macOS, this URL is a Universal
+    # Link handled by the desktop Motion.app if installed.
+    url = f"https://app.usemotion.com/web/?task={task_id}" if task_id else ""
     return {
         "source": "MOT",
+        "id": task_id,
         "title": (t.get("name") or "").strip(),
         "due": _due_string(t.get("dueDate")),
         "priority": _MOTION_PRI_OUT.get(pri_raw, "med"),
+        "url": url,
     }
 
 
