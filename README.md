@@ -23,6 +23,26 @@ A fine-grained GitHub PAT with read-only access to **Issues**, **Pull
 requests**, and **Metadata** is enough. See `config.example.toml` for the
 full list of provider blocks.
 
+## Optional setup
+
+Everything below is optional — any provider whose credentials are missing
+just shows `OFFLINE` and the rest of the dashboard works normally.
+
+- **Calendar** (macOS) — `brew install ical-buddy`. Auto-detected once
+  installed; no config needed unless `ical-buddy` lives somewhere other
+  than `/opt/homebrew/bin`.
+- **Tasks** (Motion) — set `[motion].api_key` in
+  `~/.cowork-dash/config.toml` (Motion → Settings → API & Integrations).
+- **Linear** — add one `[[linear]]` block per workspace, each with a
+  `label` and personal `api_key` (Linear → Settings → API).
+- **Claude usage** — sign in to Claude Code (`claude` CLI). The daemon
+  reads OAuth from `~/.claude/.credentials.json` or the
+  `Claude Code-credentials` keychain item.
+- **Network** — works without a token (free ipinfo.io tier, ~1k/day).
+  Add `[network].ipinfo_token` for more headroom.
+
+See the providers table below for the full source/needs mapping.
+
 ## Providers
 
 All panels read live data. Each provider polls on its own interval and
