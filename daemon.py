@@ -33,7 +33,7 @@ from typing import Any
 
 import httpx
 import psutil
-from fastapi import FastAPI
+from fastapi import Body, FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -42,6 +42,7 @@ from fastapi.staticfiles import StaticFiles
 # --------------------------------------------------------------------------- #
 
 CONFIG_PATH = Path(os.environ.get("COWORK_DASH_CONFIG", str(Path.home() / ".cowork-dash" / "config.toml")))
+SCRATCHPAD_PATH = Path(os.environ.get("COWORK_DASH_SCRATCHPAD", str(Path.home() / ".cowork-dash" / "scratchpad.txt")))
 STATIC_DIR = Path(__file__).parent / "static"
 
 # Everything the frontend renders lives in here. Each provider owns one
@@ -1338,6 +1339,34 @@ async def state_endpoint():
 @app.get("/api/health")
 async def health():
     return {"ok": True, "started_at": STATE["started_at"]}
+
+
+# Cap scratchpad to a sane size so a runaway client can't fill the disk.
+_SCRATCHPAD_MAX_BYTES = 256 * 1024
+
+
+@app.get("/api/scratchpad")
+async def scratchpad_get():
+    try:
+        text = SCRATCHPAD_PATH.read_text(encoding="utf-8") if SCRATCHPAD_PATH.exists() else ""
+    except OSError as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    return {"content": text, "updated_at": _now_iso()}
+
+
+@app.post("/api/scratchpad")
+async def scratchpad_set(payload: dict = Body(...)):
+    content = payload.get("content")
+    if not isinstance(content, str):
+        return JSONResponse({"error": "content must be a string"}, status_code=400)
+    if len(content.encode("utf-8")) > _SCRATCHPAD_MAX_BYTES:
+        return JSONResponse({"error": "content exceeds 256 KiB"}, status_code=413)
+    try:
+        SCRATCHPAD_PATH.parent.mkdir(parents=True, exist_ok=True)
+        SCRATCHPAD_PATH.write_text(content, encoding="utf-8")
+    except OSError as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    return {"ok": True, "bytes": len(content.encode("utf-8"))}
 
 
 # Mount static last so /api/* takes priority.
