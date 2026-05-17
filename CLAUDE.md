@@ -34,7 +34,9 @@ process memory; on restart, providers re-poll from scratch.
 
 ```
 daemon.py            FastAPI app, STATE blob, all provider pollers
-static/index.html    Single-page frontend (HTML + inline CSS + inline JS)
+static/index.html    Frontend markup (references /app.css and /app.js)
+static/app.css       All styles, themes, responsive blocks
+static/app.js        All client JS — render functions, polling, theme cycler
 config.example.toml  Starter config; copied to ~/.cowork-dash/config.toml on first run
 run.sh               Bootstraps .venv, copies starter config, runs the daemon
 requirements.txt     fastapi, uvicorn, httpx, psutil, tomli (3.10 fallback)
@@ -177,9 +179,13 @@ provider credentials, never log a token. Config sample lives in
 Use `_now_iso()` for every `updated_at`. UTC, ISO-8601. The frontend
 converts to "Xs ago" relative to `Date.now()`.
 
-## Frontend (`static/index.html`)
+## Frontend (`static/index.html` + `app.css` + `app.js`)
 
-Single file, no build step. Three Google Font families: Inter + Bebas
+No build step — `index.html` references `/app.css` and `/app.js` directly
+(both served by the same `StaticFiles` mount). The only inline script is
+a tiny synchronous theme-loader at the top of `<body>` that runs
+pre-paint to avoid a flash of the wrong theme; everything else lives in
+`app.js`. Three Google Font families: Inter + Bebas
 Neue + IBM Plex Mono.
 
 ### Layout
