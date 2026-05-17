@@ -18,14 +18,35 @@
     --amber: #ffaa44;
     --gold: #ffe88a;
     --magenta: #ff2a6d;
+    --primary-deep: #2a5070;
+    --primary-deeper: #15304a;
+    --alarm: #ff3344;
+
+    /* RGB triplets (space-separated, modern rgb() syntax) so rgba()-style tints
+       can be themed without rewriting every alpha. Use as: rgb(var(--cyan-rgb) / 0.18) */
+    --bg-rgb: 3 6 15;
+    --panel-rgb: 10 21 48;
+    --rule-rgb: 26 48 96;
+    --cyan-rgb: 95 200 232;
+    --amber-rgb: 255 170 68;
+    --gold-rgb: 255 232 138;
+    --magenta-rgb: 255 42 109;
+    --alarm-rgb: 255 51 68;
+
+    /* Tinted surfaces */
+    --ticker-bg-rgb: 0 40 20;     /* dark green tint for terminal-feel ticker */
+    --trace-bg-rgb: 15 36 75;     /* slightly lifted from panel for oscilloscope wells */
+
+    /* Glow alphas — tunable per-theme so light themes can dial halos down */
+    --scanline-alpha: 0.022;
+    --glow-strong: 0.5;
+    --glow-soft: 0.35;
 
     /* Aliases so existing rules adopt the new palette without rewrites */
-    --bg-panel: rgba(10, 21, 48, 0.55);
+    --bg-panel: rgb(var(--panel-rgb) / 0.55);
     --border: var(--rule);
     --primary: var(--cyan);
     --primary-dim: var(--dim);
-    --primary-deep: #2a5070;
-    --primary-deeper: #15304a;
     --accent: var(--amber);
     --warn: var(--gold);
     --alert: var(--magenta);
@@ -34,6 +55,220 @@
     --sans: 'Inter', system-ui, sans-serif;
     --vt: 'Bebas Neue', 'Inter', sans-serif;
     --mono: 'IBM Plex Mono', 'Courier New', monospace;
+
+    /* ============================================================
+       TYPE SCALE — breakpoint media queries override these values.
+       Use these everywhere instead of bare pixel font-sizes so the
+       4K / iPad / mobile blocks become 3-line overrides.
+       ============================================================ */
+    --fs-2xs: 9px;       /* unit suffixes, trace axis */
+    --fs-xs:  10px;      /* small labels, tabs, status chips */
+    --fs-sm:  11px;      /* default chrome (panel titles, hdr) */
+    --fs-md:  12px;      /* default data rows */
+    --fs-lg:  13px;      /* body baseline */
+    --fs-xl:  15px;      /* 4K body baseline */
+    --fs-display:    32px;  /* header timecode (default) */
+    --fs-display-sm: 20px;  /* mobile */
+    --fs-display-md: 24px;  /* narrow / tablet */
+    --fs-display-lg: 48px;  /* 4K */
+
+    /* ============================================================
+       SPACING SCALE — 2px baseline grid, numeric so adding a stop
+       (e.g. --space-8: 16px) is trivial. Use these for padding,
+       margin, gap; let breakpoints retune component-level tokens
+       in step 3 rather than overriding raw values site by site.
+       ============================================================ */
+    --space-1:  2px;
+    --space-2:  4px;
+    --space-3:  6px;
+    --space-4:  8px;
+    --space-5:  10px;
+    --space-6:  12px;
+    --space-7:  14px;
+    --space-8:  18px;
+    --space-9:  22px;
+    --space-10: 32px;
+
+    /* ============================================================
+       COMPONENT TOKENS — one knob per thing that retunes per
+       breakpoint. Padding splits y/x so a single axis can change
+       (e.g. tighten panel-x for iPad portrait without squashing
+       vertical rhythm). Reference these from component CSS;
+       reference SCALE tokens here.
+
+       After step 3, each @media block is mostly :root overrides
+       of these tokens — no per-component rule overrides needed.
+       ============================================================ */
+    --pad-body:        var(--space-7);
+    --pad-panel-y:     var(--space-4);
+    --pad-panel-x:     var(--space-6);
+    --pad-hdr-y:       var(--space-5);
+    --pad-hdr-x:       var(--space-9);  /* right */
+    --pad-hdr-x-l:     24px;             /* left — slightly wider to balance slashed corner */
+    --pad-ticker-y:    5px;
+    --pad-ticker-x:    var(--space-6);
+    --pad-tab-y:       7px;
+    --pad-tab-x:       11px;
+    --gap-panels:      var(--space-4);
+
+    --fs-body:         var(--fs-lg);
+    --fs-hdr-chip:     var(--fs-sm);
+    --fs-hdr-display:  var(--fs-display);
+    --fs-panel-title:  var(--fs-sm);
+    --fs-tab:          var(--fs-xs);
+    --fs-ticker:       var(--fs-sm);
+  }
+
+  /* ============================================================
+     THEMES — toggle via body class. Each theme overrides the base
+     palette and its rgb-triplet counterparts.
+     ============================================================ */
+
+  /* TRON LEGACY DARK — true-black grid with electric blue, Clu orange used sparingly */
+  body.theme-tron-dark {
+    --bg: #000308;
+    --panel: #001220;
+    --rule: #0a3a55;
+    --dim: #4a8aa8;
+    --cyan: #6fc3df;
+    --amber: #ff7a00;
+    --gold: #c5eaff;
+    --magenta: #ff4a4a;
+    --primary-deep: #1d5470;
+    --primary-deeper: #0a3a50;
+    --alarm: #ff4a4a;
+    --bg-rgb: 0 3 8;
+    --panel-rgb: 0 18 32;
+    --rule-rgb: 10 58 85;
+    --cyan-rgb: 111 195 223;
+    --amber-rgb: 255 122 0;
+    --gold-rgb: 197 234 255;
+    --magenta-rgb: 255 74 74;
+    --alarm-rgb: 255 74 74;
+    --ticker-bg-rgb: 0 20 35;
+    --trace-bg-rgb: 5 28 48;
+    /* Aliases — MUST be redeclared in every theme. CSS custom-property
+       var() substitution resolves on the *declaring element*, not at use
+       site (CSS Variables Level 1, §3.2). Declared only in :root, the
+       aliases would lock to :root's --cyan/--amber/--gold/--magenta and
+       never pick up theme overrides. */
+    --bg-panel: rgb(var(--panel-rgb) / 0.55);
+    --border: var(--rule);
+    --primary: var(--cyan);
+    --primary-dim: var(--dim);
+    --accent: var(--amber);
+    --warn: var(--gold);
+    --alert: var(--magenta);
+    --header-amber: var(--gold);
+  }
+
+  /* TRON LEGACY LIGHT — the white-room arena scenes: cool-white field with grid blue.
+     All body text pushed to near-black for crisp readability against light panels. */
+  body.theme-tron-light {
+    --bg: #dde6ec;
+    --panel: #eef4f8;
+    --rule: #5a82a0;
+    --dim: #051828;          /* primary body text — near-black navy */
+    --cyan: #002238;         /* readouts / titles */
+    --amber: #5a1f00;        /* highlights — deep Clu orange */
+    --gold: #001a2e;         /* timecode / biggest readouts */
+    --magenta: #6e0a20;
+    --primary-deep: #173752; /* secondary muted text — still ~9:1 contrast */
+    --primary-deeper: #94b2c4;/* empty heatmap cells, faint dividers */
+    --alarm: #6e0a20;
+    --bg-rgb: 221 230 236;
+    --panel-rgb: 238 244 248;
+    --rule-rgb: 90 130 160;
+    --cyan-rgb: 0 34 56;
+    --amber-rgb: 90 31 0;
+    --gold-rgb: 0 26 46;
+    --magenta-rgb: 110 10 32;
+    --alarm-rgb: 110 10 32;
+    --ticker-bg-rgb: 200 222 232;
+    --trace-bg-rgb: 218 234 242;
+    --scanline-alpha: 0.015;
+    --glow-strong: 0.15;
+    --glow-soft: 0.1;
+    --bg-panel: rgb(var(--panel-rgb) / 0.55);
+    --border: var(--rule);
+    --primary: var(--cyan);
+    --primary-dim: var(--dim);
+    --accent: var(--amber);
+    --warn: var(--gold);
+    --alert: var(--magenta);
+    --header-amber: var(--gold);
+  }
+
+  /* CYBERPUNK 2077 DARK — neon yellow + cyan + hot magenta on near-black */
+  body.theme-cyberpunk-dark {
+    --bg: #06020a;
+    --panel: #160c1e;
+    --rule: #3a1e50;
+    --dim: #8a5ec0;
+    --cyan: #00f0ff;
+    --amber: #fcee0a;
+    --gold: #fcee0a;
+    --magenta: #ff0055;
+    --primary-deep: #5e3088;
+    --primary-deeper: #2e1844;
+    --alarm: #ff0055;
+    --bg-rgb: 6 2 10;
+    --panel-rgb: 22 12 30;
+    --rule-rgb: 58 30 80;
+    --cyan-rgb: 0 240 255;
+    --amber-rgb: 252 238 10;
+    --gold-rgb: 252 238 10;
+    --magenta-rgb: 255 0 85;
+    --alarm-rgb: 255 0 85;
+    --ticker-bg-rgb: 30 0 40;
+    --trace-bg-rgb: 26 14 36;
+    --glow-strong: 0.7;
+    --glow-soft: 0.45;
+    --bg-panel: rgb(var(--panel-rgb) / 0.55);
+    --border: var(--rule);
+    --primary: var(--cyan);
+    --primary-dim: var(--dim);
+    --accent: var(--amber);
+    --warn: var(--gold);
+    --alert: var(--magenta);
+    --header-amber: var(--gold);
+  }
+
+  /* EDGERUNNERS LIGHT — chromatic high-contrast: pale lavender field + saturated magenta/yellow.
+     All body text pushed near-black so panel content reads cleanly. */
+  body.theme-cyberpunk-light {
+    --bg: #ece2f0;
+    --panel: #f6eef8;
+    --rule: #6a3a90;
+    --dim: #170428;          /* primary body text — near-black aubergine */
+    --cyan: #002c40;         /* readouts / titles — deep teal */
+    --amber: #3e2400;        /* highlights — burnt umber */
+    --gold: #2e1a00;         /* biggest readouts (timecode) */
+    --magenta: #680830;      /* alarms + accents — saturated berry */
+    --primary-deep: #34085e; /* secondary muted text */
+    --primary-deeper: #b294c8;/* empty heatmap cells */
+    --alarm: #680830;
+    --bg-rgb: 236 226 240;
+    --panel-rgb: 246 238 248;
+    --rule-rgb: 106 58 144;
+    --cyan-rgb: 0 44 64;
+    --amber-rgb: 62 36 0;
+    --gold-rgb: 46 26 0;
+    --magenta-rgb: 104 8 48;
+    --alarm-rgb: 104 8 48;
+    --ticker-bg-rgb: 230 210 240;
+    --trace-bg-rgb: 240 226 246;
+    --scanline-alpha: 0.018;
+    --glow-strong: 0.16;
+    --glow-soft: 0.1;
+    --bg-panel: rgb(var(--panel-rgb) / 0.55);
+    --border: var(--rule);
+    --primary: var(--cyan);
+    --primary-dim: var(--dim);
+    --accent: var(--amber);
+    --warn: var(--gold);
+    --alert: var(--magenta);
+    --header-amber: var(--gold);
   }
 
   * { box-sizing: border-box; }
@@ -43,15 +278,18 @@
     background: var(--bg);
     color: var(--primary);
     font-family: var(--mono);
-    font-size: 13px;
+    font-size: var(--fs-body);
     line-height: 1.45;
     overflow: hidden;
+    /* 100vh ignores iOS Safari URL bar — 100dvh respects it. Older
+       browsers without dvh support fall back to the first declaration. */
     height: 100vh;
+    height: 100dvh;
     width: 100vw;
   }
 
   body {
-    padding: 14px;
+    padding: var(--pad-body);
     position: relative;
   }
 
@@ -62,8 +300,8 @@
     pointer-events: none;
     background: repeating-linear-gradient(
       0deg,
-      rgba(95, 200, 232, 0.022) 0px,
-      rgba(95, 200, 232, 0.022) 1px,
+      rgb(var(--cyan-rgb) / var(--scanline-alpha)) 0px,
+      rgb(var(--cyan-rgb) / var(--scanline-alpha)) 1px,
       transparent 1px,
       transparent 4px
     );
@@ -73,7 +311,7 @@
   .layout {
     display: grid;
     grid-template-rows: auto 1fr auto;
-    gap: 8px;
+    gap: var(--gap-panels);
     height: 100%;
   }
 
@@ -82,28 +320,28 @@
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    padding: 10px 22px 10px 24px;
-    background: rgba(10, 21, 48, 0.55);
+    padding: var(--pad-hdr-y) var(--pad-hdr-x) var(--pad-hdr-y) var(--pad-hdr-x-l);
+    background: var(--bg-panel);
     border: 1px solid var(--rule);
     font-family: var(--sans);
-    font-size: 11px;
+    font-size: var(--fs-hdr-chip);
     font-weight: 500;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     /* slashed top-left + bracketed bottom-right */
     clip-path: polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px);
   }
-  .hdr .left { color: var(--dim); display: flex; align-items: center; gap: 12px; }
+  .hdr .left { color: var(--dim); display: flex; align-items: center; gap: var(--space-6); }
   .hdr .center {
     color: var(--gold);
     text-align: center;
     font-family: var(--vt);
-    font-size: 32px;
+    font-size: var(--fs-hdr-display);
     letter-spacing: 0.06em;
     line-height: 1;
-    text-shadow: 0 0 12px rgba(255, 232, 138, 0.35);
+    text-shadow: 0 0 12px rgb(var(--gold-rgb) / var(--glow-soft));
   }
-  .hdr .right { color: var(--dim); text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 18px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; }
+  .hdr .right { color: var(--dim); text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-8); font-family: var(--mono); font-size: var(--fs-hdr-chip); letter-spacing: 0.06em; }
   .hdr .right .sys { color: var(--dim); }
   .hdr .op-prefix { color: var(--dim); font-weight: 400; }
   .hdr .op-name { color: var(--cyan); font-weight: 600; letter-spacing: 0.18em; }
@@ -116,18 +354,39 @@
     box-shadow: 0 0 8px var(--magenta);
     animation: pulse 1.4s infinite;
   }
-  .op-status {
+  /* Chip base — shared by .op-status, .theme-chip, and any future
+     status/control pip in the header chrome. Variants only set color
+     + interactivity (cursor, transition, hover). */
+  .op-status,
+  .theme-chip {
     display: inline-block;
     border: 1px solid var(--rule);
-    padding: 3px 8px;
-    color: var(--amber);
+    padding: 3px var(--space-4);
     font-family: var(--sans);
-    font-size: 10px;
+    font-size: var(--fs-xs);
     letter-spacing: 0.22em;
-    margin-left: 4px;
+  }
+
+  .op-status {
+    color: var(--amber);
+    margin-left: var(--space-2);
   }
   body.offline .op-status { color: var(--magenta); border-color: var(--magenta); }
   body.offline .rec-dot { background: var(--magenta); }
+
+  /* Theme cycler chip — click or press T to advance. */
+  .theme-chip {
+    color: var(--cyan);
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+  }
+  .theme-chip:hover {
+    color: var(--amber);
+    border-color: var(--amber);
+    background: rgb(var(--amber-rgb) / 0.06);
+  }
+  .theme-chip .label { color: var(--dim); margin-right: var(--space-3); }
 
   @keyframes pulse {
     0%, 60% { opacity: 1; }
@@ -138,43 +397,63 @@
   .grid {
     display: grid;
     grid-template-columns: 1fr 1.25fr 1fr;
-    gap: 8px;
+    gap: var(--gap-panels);
     min-height: 0;
   }
 
-  .col { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: var(--gap-panels); min-height: 0; }
 
   .panel {
-    border: 1px solid var(--border);
-    background: var(--bg-panel);
-    padding: 8px 12px;
+    /* Chrome is painted by ::before (border-tone rule) and ::after
+       (fill, inset 1px so 1px of ::before shows through as the slashed
+       border ring). Padding stays on .panel; children sit on z-index 1. */
+    background: transparent;
+    border: none;
+    padding: var(--pad-panel-y) var(--pad-panel-x);
     position: relative;
     overflow: hidden;
+    /* Establish an inline-size container so panel internals can
+       respond to the panel's own width rather than the viewport.
+       Same Linear/GitHub panel might be ~720px in 3-col desktop or
+       ~410px in 2-col tablet portrait — container queries below let
+       internals adapt without adding viewport breakpoints. */
+    container-type: inline-size;
+    container-name: panel;
   }
+  .panel::before,
+  .panel::after {
+    content: '';
+    position: absolute;
+    clip-path: polygon(18px 0, 100% 0, 100% 100%, 0 100%, 0 18px);
+    pointer-events: none;
+  }
+  .panel::before { inset: 0; background: var(--rule); }
+  .panel::after  { inset: 1px; background: var(--bg-panel); }
+  .panel > * { position: relative; z-index: 1; }
   .panel.grow { flex: 1; }
 
   .panel-title {
     color: var(--cyan);
     font-family: var(--sans);
-    font-size: 11px;
+    font-size: var(--fs-panel-title);
     font-weight: 500;
     letter-spacing: 0.18em;
     margin-bottom: 7px;
     border-bottom: 1px dashed var(--primary-deep);
-    padding-bottom: 4px;
+    padding-bottom: var(--space-2);
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     text-transform: uppercase;
   }
   .panel-title .ttl::before { content: '▌ '; }
-  .panel-title .meta { color: var(--primary-deep); font-size: 11px; }
+  .panel-title .meta { color: var(--primary-deep); font-size: var(--fs-panel-title); }
   .panel-title .meta.mocked { color: var(--warn); }
 
   .row {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--space-4);
     margin: 3px 0;
   }
   .row .label { color: var(--primary-dim); }
@@ -183,13 +462,13 @@
   .bar {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-3);
     margin: 3px 0;
     font-family: var(--mono);
   }
-  .bar .blab { width: 40px; color: var(--primary-dim); font-size: 11px; }
+  .bar .blab { width: 40px; color: var(--primary-dim); font-size: var(--fs-sm); }
   .bar .btrack { flex: 1; letter-spacing: -0.5px; color: var(--primary); }
-  .bar .bval { width: 50px; text-align: right; color: var(--primary); font-size: 12px; }
+  .bar .bval { width: 50px; text-align: right; color: var(--primary); font-size: var(--fs-md); }
 
   .ok { color: var(--primary); }
   .warn { color: var(--warn); }
@@ -214,15 +493,15 @@
   .task {
     display: grid;
     grid-template-columns: 14px 32px 1fr auto;
-    gap: 6px;
+    gap: var(--space-3);
     align-items: baseline;
     margin: 3px 0;
-    font-size: 12px;
+    font-size: var(--fs-md);
   }
   .task .pri { color: var(--alert); text-align: center; }
   .task .src {
     color: var(--primary-deep);
-    font-size: 10px;
+    font-size: var(--fs-xs);
     border: 1px solid var(--primary-deeper);
     padding: 0 3px;
     text-align: center;
@@ -231,16 +510,99 @@
   .task .due.warn { color: var(--warn); }
   .task .due.alert { color: var(--alert); }
 
+  /* Container-query refinements: when a panel is narrow (e.g. Linear
+     panel in 2-col tablet portrait), drop the per-row source label and
+     collapse the grid so the title gets the saved real estate. */
+  @container panel (max-width: 380px) {
+    .task { grid-template-columns: 14px 1fr auto; }
+    .task .src { display: none; }
+  }
+
+  /* Any row carrying a data-url becomes a click target. Hover lifts the cyan
+     a notch without making the row look like a button. */
+  [data-url] { cursor: pointer; transition: background 0.1s, color 0.1s; }
+  [data-url]:hover { background: rgb(var(--cyan-rgb) / 0.06); }
+  [data-url]:hover .title, [data-url]:hover .pr-title { color: var(--cyan); }
+
+  /* Network panel */
+  .net-row {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: var(--space-4);
+    align-items: baseline;
+    font-family: var(--mono);
+    font-size: var(--fs-md);
+    margin: var(--space-1) 0;
+  }
+  .net-row .k { color: var(--primary-deep); font-size: var(--fs-xs); letter-spacing: 0.12em; }
+  .net-row .v { color: var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .net-row .v.alert { color: var(--alert); }
+  .net-row .v.warn { color: var(--warn); }
+  .net-row .v.ok { color: var(--cyan); }
+
+  /* Top processes panel + inline CPU/MEM toggle */
+  .procs-toggle {
+    display: inline-flex;
+    gap: var(--space-2);
+    font-family: var(--mono);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.12em;
+  }
+  .procs-toggle .t {
+    padding: 1px var(--space-3);
+    border: 1px solid var(--rule);
+    color: var(--primary-deep);
+    cursor: pointer;
+    user-select: none;
+  }
+  .procs-toggle .t:hover { color: var(--cyan); }
+  .procs-toggle .t.active {
+    color: var(--amber);
+    border-color: var(--amber);
+    background: rgb(var(--amber-rgb) / 0.07);
+  }
+  .proc-row {
+    display: grid;
+    grid-template-columns: 1fr 52px 48px;
+    gap: var(--space-3);
+    align-items: baseline;
+    font-family: var(--mono);
+    font-size: var(--fs-md);
+    margin: var(--space-1) 0;
+  }
+  .proc-row .name { color: var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .proc-row .pid  { color: var(--primary-deep); font-size: var(--fs-xs); text-align: right; }
+  .proc-row .val  { color: var(--amber); text-align: right; }
+
+  /* Scratchpad — full-bleed textarea, mono, ops-console flavor. */
+  textarea.scratch {
+    flex: 1;
+    width: 100%;
+    min-height: 140px;
+    background: transparent;
+    border: 1px solid var(--rule);
+    color: var(--primary);
+    font-family: var(--mono);
+    font-size: var(--fs-md);
+    line-height: 1.45;
+    padding: var(--space-4) var(--space-5);
+    resize: none;
+    outline: none;
+    box-sizing: border-box;
+  }
+  textarea.scratch:focus { border-color: var(--cyan); }
+  textarea.scratch::placeholder { color: var(--primary-deep); }
+
   /* Linear cycle strip */
   .cycle-strip {
     display: flex;
-    gap: 8px;
+    gap: var(--space-4);
     align-items: baseline;
     font-family: var(--mono);
-    font-size: 12px;
-    padding: 4px 0 8px;
+    font-size: var(--fs-md);
+    padding: var(--space-2) 0 var(--space-4);
     border-bottom: 1px solid var(--rule);
-    margin-bottom: 6px;
+    margin-bottom: var(--space-3);
   }
   .cycle-strip .bar { color: var(--cyan); letter-spacing: -1px; }
   .cycle-strip .warn { color: var(--amber); }
@@ -250,7 +612,7 @@
   .cal-row {
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: 12px;
+    gap: var(--space-6);
     margin: 3px 0;
     align-items: baseline;
   }
@@ -264,7 +626,7 @@
     display: grid;
     grid-template-columns: repeat(20, minmax(0, 24px));
     gap: 3px;
-    margin: 10px 0 4px;
+    margin: var(--space-5) 0 var(--space-2);
     justify-content: center;
   }
   .heatmap .day {
@@ -274,40 +636,46 @@
   }
   /* Cyan-tinted intensity ramp to match NIGHTOPS — low = barely-there over panel navy,
      high = bright cyan with subtle bloom. */
-  .heatmap .day.l1 { background: rgba(95, 200, 232, 0.18); }
-  .heatmap .day.l2 { background: rgba(95, 200, 232, 0.38); }
-  .heatmap .day.l3 { background: rgba(95, 200, 232, 0.60); }
-  .heatmap .day.l4 { background: rgba(95, 200, 232, 0.82); }
+  .heatmap .day.l1 { background: rgb(var(--cyan-rgb) / 0.18); }
+  .heatmap .day.l2 { background: rgb(var(--cyan-rgb) / 0.38); }
+  .heatmap .day.l3 { background: rgb(var(--cyan-rgb) / 0.60); }
+  .heatmap .day.l4 { background: rgb(var(--cyan-rgb) / 0.82); }
   .heatmap .day.l5 { background: var(--cyan); box-shadow: 0 0 4px var(--cyan); }
   .heatmap .day[data-today="1"] { border-color: var(--amber); }
 
   .heatmap-legend {
     display: flex;
     align-items: center;
-    gap: 4px;
-    font-size: 10px;
+    gap: var(--space-2);
+    font-size: var(--fs-xs);
     color: var(--primary-deep);
     justify-content: flex-end;
-    margin-top: 4px;
+    margin-top: var(--space-2);
   }
   .heatmap-legend .sq {
-    display: inline-block; width: 8px; height: 8px;
+    display: inline-block; width: var(--space-4); height: var(--space-4);
+    background: var(--primary-deeper);
   }
+  .heatmap-legend .sq.l1 { background: rgb(var(--cyan-rgb) / 0.18); }
+  .heatmap-legend .sq.l2 { background: rgb(var(--cyan-rgb) / 0.38); }
+  .heatmap-legend .sq.l3 { background: rgb(var(--cyan-rgb) / 0.60); }
+  .heatmap-legend .sq.l4 { background: rgb(var(--cyan-rgb) / 0.82); }
+  .heatmap-legend .sq.l5 { background: var(--cyan); }
 
   /* CC sessions blinker */
   .blink-cursor::after {
     content: '▎';
     color: var(--accent);
     animation: pulse 1.2s infinite;
-    margin-left: 2px;
+    margin-left: var(--space-1);
   }
 
   /* Ticker */
   .ticker {
     border: 1px solid var(--border);
-    background: rgba(0, 40, 20, 0.3);
-    padding: 5px 12px;
-    font-size: 11px;
+    background: rgb(var(--ticker-bg-rgb) / 0.3);
+    padding: var(--pad-ticker-y) var(--pad-ticker-x);
+    font-size: var(--fs-ticker);
     color: var(--primary-dim);
     overflow: hidden;
     white-space: nowrap;
@@ -324,12 +692,12 @@
     100% { transform: translateX(-100%); }
   }
 
-  .ticker-item { margin-right: 32px; }
-  .ticker-item .ts { color: var(--accent); margin-right: 6px; }
+  .ticker-item { margin-right: var(--space-10); }
+  .ticker-item .ts { color: var(--accent); margin-right: var(--space-3); }
   .ticker-item .src {
     color: var(--primary-deep);
-    font-size: 10px;
-    margin-right: 4px;
+    font-size: var(--fs-xs);
+    margin-right: var(--space-2);
   }
   .ticker-item.warn .ts { color: var(--warn); }
   .ticker-item.alert .ts { color: var(--alert); }
@@ -338,9 +706,9 @@
   .pr-item {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
-    margin: 2px 0;
-    font-size: 11px;
+    gap: var(--space-4);
+    margin: var(--space-1) 0;
+    font-size: var(--fs-sm);
     overflow: hidden;
   }
   .pr-item .pr-title {
@@ -350,14 +718,14 @@
     text-overflow: ellipsis;
     flex: 1;
   }
-  .pr-item .pr-repo { color: var(--primary-deep); font-size: 10px; }
+  .pr-item .pr-repo { color: var(--primary-deep); font-size: var(--fs-xs); }
 
   /* Status footer */
   .panel-foot {
     color: var(--primary-deeper);
-    font-size: 10px;
+    font-size: var(--fs-xs);
     text-align: right;
-    margin-top: 4px;
+    margin-top: var(--space-2);
     border-top: 1px dashed var(--primary-deeper);
     padding-top: 3px;
   }
@@ -366,7 +734,7 @@
   .offline-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(255, 51, 68, 0.08);
+    background: rgb(var(--alarm-rgb) / 0.08);
     z-index: 50;
     display: none;
     pointer-events: none;
@@ -377,10 +745,10 @@
   .spark {
     display: inline-flex;
     align-items: flex-end;
-    height: 12px;
+    height: var(--space-6);
     gap: 1px;
     vertical-align: middle;
-    margin-left: 6px;
+    margin-left: var(--space-3);
   }
   .spark span {
     display: inline-block;
@@ -391,43 +759,31 @@
   /* error chip */
   .err {
     color: var(--alert);
-    font-size: 11px;
-    padding: 2px 6px;
+    font-size: var(--fs-sm);
+    padding: var(--space-1) var(--space-3);
     border: 1px solid var(--alert);
     display: inline-block;
-    margin: 4px 0;
+    margin: var(--space-2) 0;
   }
 
-  /* ---------- NIGHTOPS panel chrome (in-progress style; opt-in via .panel-nightops) ---------- */
-  .panel-nightops {
-    background: transparent !important;
-    border: none !important;
-    position: relative;
-    padding: 0 !important;
-  }
-  .panel-nightops::before,
-  .panel-nightops::after {
-    content: '';
-    position: absolute;
-    clip-path: polygon(18px 0, 100% 0, 100% 100%, 0 100%, 0 18px);
-    pointer-events: none;
-  }
-  .panel-nightops::before { inset: 0; background: var(--rule); }
-  .panel-nightops::after  { inset: 1px; background: var(--panel); }
-  .panel-nightops > * { position: relative; z-index: 1; }
+  /* Tabbed-layout modifier — used by panels whose top edge is occupied
+     by .panel-tabs (must span edge-to-edge) and whose body padding is
+     provided by an inner .panel-body wrapper. Chrome is inherited from
+     .panel itself; this just zeroes the outer padding. */
+  .panel-nightops { padding: 0; }
 
   .panel-tabs {
     display: flex;
     border-bottom: 1px solid var(--rule);
     padding-left: 16px;
     font-family: var(--sans);
-    font-size: 10px;
+    font-size: var(--fs-tab);
     font-weight: 500;
     letter-spacing: 0.22em;
     text-transform: uppercase;
   }
   .panel-tabs .tab {
-    padding: 7px 11px;
+    padding: var(--pad-tab-y) var(--pad-tab-x);
     color: var(--dim);
     border-right: 1px solid var(--rule);
     user-select: none;
@@ -437,18 +793,18 @@
   .panel-tabs .tab:hover { color: var(--cyan); }
   .panel-tabs .tab.active {
     color: var(--amber);
-    background: rgba(255, 170, 68, 0.07);
+    background: rgb(var(--amber-rgb) / 0.07);
     box-shadow: inset 0 -1px 0 var(--amber);
   }
   .panel-tabs .tab.dead { color: var(--primary-deep); opacity: 0.65; cursor: default; }
   .panel-tabs .tab.dead:hover { color: var(--primary-deep); }
 
-  .panel-body { padding: 10px 14px 14px; }
+  .panel-body { padding: var(--space-5) var(--space-7) var(--space-7); }
   .panel-body .panel-title {
     color: var(--cyan);
     border-bottom: 1px solid var(--rule);
     padding-bottom: 5px;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-4);
   }
 
   .panel-stamp {
@@ -457,7 +813,7 @@
     right: 11px;
     color: var(--dim);
     font-family: var(--mono);
-    font-size: 9px;
+    font-size: var(--fs-2xs);
     letter-spacing: 0.2em;
     pointer-events: none;
     z-index: 2;
@@ -473,24 +829,24 @@
   .rail {
     display: none;  /* shown at 4K via media query */
     flex-direction: column;
-    gap: 14px;
+    gap: var(--space-7);
     overflow: hidden;
     font-family: var(--mono);
-    font-size: 11px;
+    font-size: var(--fs-sm);
     letter-spacing: 0.12em;
     color: var(--dim);
   }
   .rail-section {
     border: 1px solid var(--rule);
-    background: rgba(10, 21, 48, 0.45);
-    padding: 12px 14px;
+    background: rgb(var(--panel-rgb) / 0.45);
+    padding: var(--space-6) var(--space-7);
     position: relative;
     clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
   }
   .rail-section h4 {
-    margin: 0 0 8px 0;
+    margin: 0 0 var(--space-4) 0;
     font-family: var(--sans);
-    font-size: 10px;
+    font-size: var(--fs-xs);
     font-weight: 500;
     color: var(--cyan);
     letter-spacing: 0.22em;
@@ -501,8 +857,8 @@
   .rail-row {
     display: flex;
     justify-content: space-between;
-    margin: 2px 0;
-    font-size: 11px;
+    margin: var(--space-1) 0;
+    font-size: var(--fs-sm);
   }
   .rail-row .idx {
     color: var(--primary-deep);
@@ -515,14 +871,14 @@
   /* NET TRACE oscilloscope (right rail) */
   .rail-row .v.amber-v { color: var(--amber); }
   .rail-row .v.cyan-v { color: var(--cyan); }
-  .rail-row .v .unit { color: var(--primary-deep); font-size: 9px; margin-left: 4px; letter-spacing: 0.1em; }
+  .rail-row .v .unit { color: var(--primary-deep); font-size: var(--fs-2xs); margin-left: var(--space-2); letter-spacing: 0.1em; }
 
   .net-trace {
     width: 100%;
     height: 80px;
     display: block;
-    margin: 8px 0 4px;
-    background: rgba(15, 36, 75, 0.4);
+    margin: var(--space-4) 0 var(--space-2);
+    background: rgb(var(--trace-bg-rgb) / 0.4);
     border: 1px solid var(--rule);
     clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px);
   }
@@ -532,33 +888,33 @@
     stroke: var(--amber);
     stroke-width: 1.5;
     vector-effect: non-scaling-stroke;
-    filter: drop-shadow(0 0 3px rgba(255, 170, 68, 0.5));
+    filter: drop-shadow(0 0 3px rgb(var(--amber-rgb) / var(--glow-strong)));
   }
   .net-trace .trace-down {
     fill: none;
     stroke: var(--cyan);
     stroke-width: 1.5;
     vector-effect: non-scaling-stroke;
-    filter: drop-shadow(0 0 3px rgba(95, 200, 232, 0.4));
+    filter: drop-shadow(0 0 3px rgb(var(--cyan-rgb) / var(--glow-soft)));
   }
   .trace-axis {
     display: flex;
     justify-content: space-between;
-    font-size: 9px;
+    font-size: var(--fs-2xs);
     color: var(--primary-deep);
     letter-spacing: 0.18em;
-    padding: 0 2px;
+    padding: 0 var(--space-1);
   }
 
   /* Inline sparkline in header (visible at every breakpoint except very narrow) */
   .sys-spark-wrap {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-3);
   }
   .sys-spark {
     width: 64px;
-    height: 12px;
+    height: var(--space-6);
     display: block;
   }
   .sys-spark .spark-up {
@@ -566,7 +922,7 @@
     stroke: var(--amber);
     stroke-width: 1.2;
     vector-effect: non-scaling-stroke;
-    filter: drop-shadow(0 0 2px rgba(255, 170, 68, 0.45));
+    filter: drop-shadow(0 0 2px rgb(var(--amber-rgb) / var(--glow-soft)));
   }
   .sys-spark .spark-down {
     fill: none;
@@ -588,7 +944,7 @@
     overflow: hidden;
     border: 1px solid var(--rule);
     clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
-    background: rgba(10, 21, 48, 0.45);
+    background: rgb(var(--panel-rgb) / 0.45);
   }
   .rail-radar::before {
     content: '';
@@ -635,66 +991,155 @@
 
   /* ---------- responsive breakpoints ---------- */
 
+  /* ============================================================
+     RESPONSIVE — each block is :root token overrides + structural
+     grid/display-only rules. No per-component restyle.
+     ============================================================ */
+
   /* 4K — show rails, scale everything up */
   @media (min-width: 2400px) {
-    html, body { font-size: 15px; }
+    :root {
+      --pad-body:        var(--space-9);
+      --pad-panel-y:     var(--space-7);
+      --pad-panel-x:     var(--space-8);
+      --pad-hdr-y:       var(--space-7);
+      --pad-hdr-x:       var(--space-10);
+      --pad-hdr-x-l:     var(--space-10);
+      --pad-ticker-y:    var(--space-4);
+      --pad-ticker-x:    var(--space-8);
+      --pad-tab-y:       9px;
+      --pad-tab-x:       var(--space-7);
+      --gap-panels:      var(--space-6);
+
+      --fs-body:         var(--fs-xl);
+      --fs-hdr-chip:     var(--fs-md);
+      --fs-hdr-display:  var(--fs-display-lg);
+      --fs-panel-title:  var(--fs-lg);
+      --fs-tab:          var(--fs-sm);
+      --fs-ticker:       var(--fs-md);
+    }
+    /* Structural — can't be tokenized */
     body {
-      padding: 22px;
       display: grid;
       grid-template-columns: 260px 1fr 280px;
       grid-template-rows: 100%;
       gap: 16px;
       height: 100vh;
     }
-    body::before, body::after { /* keep overlays full-viewport */ inset: 0; }
+    body::before, body::after { inset: 0; }  /* keep overlays full-viewport */
     .layout { grid-column: 2; height: 100%; min-height: 0; }
     .rail-left  { grid-column: 1; grid-row: 1; display: flex; }
     .rail-right { grid-column: 3; grid-row: 1; display: flex; }
-
-    .hdr { padding: 14px 32px; font-size: 13px; }
-    .hdr .center { font-size: 48px; }
-    .hdr .right { gap: 24px; font-size: 12px; }
-    .hdr .op-status { font-size: 11px; }
-
-    .panel { padding: 14px 18px; }
-    .panel-tabs .tab { padding: 9px 14px; font-size: 11px; }
-    .panel-title { font-size: 13px; }
-
-    .grid { gap: 12px; }
-    .layout { gap: 12px; }
-
-    .ticker { padding: 8px 18px; font-size: 12px; }
+    /* One-offs that aren't generic enough to tokenize */
+    .hdr .right    { gap: 24px; }
+    .hdr .op-status { font-size: var(--fs-sm); }
   }
 
   /* Narrow tall (≤1400px) — drop heatmap, span github full-width on row 2 */
   @media (max-width: 1400px) {
+    :root {
+      --pad-hdr-y:       var(--space-4);
+      --pad-hdr-x:       var(--space-7);
+      --pad-hdr-x-l:     var(--space-7);
+      --fs-hdr-chip:     var(--fs-xs);
+      --fs-hdr-display:  var(--fs-display-md);
+    }
     #panel-heatmap { display: none; }
-    .grid { grid-template-columns: 1fr 1fr; }
+    .grid { grid-template-columns: 1fr 2fr; }
     .grid > .col:nth-child(3) {
       grid-column: 1 / -1;
       flex-direction: row;
-      gap: 8px;
     }
     .grid > .col:nth-child(3) > .panel { flex: 1; }
-    .hdr { padding: 8px 14px; font-size: 10px; }
-    .hdr .center { font-size: 24px; }
-    .hdr .right { gap: 10px; }
+    .hdr .right { gap: var(--space-5); }
   }
 
-  /* Very narrow (≤900px) — single col, hide MOCK-only panels */
-  @media (max-width: 900px) {
-    body { padding: 8px; }
+  /* Tablet (≤1024px) — covers iPad mini/standard/Pro 11/13 portrait
+     plus small landscape tablets. Reflows to a 2-col grid, allows the
+     viewport to scroll vertically (8 panels won't fit at this height),
+     and tightens chrome. Inherits all narrow (≤1400px) overrides above
+     so the col-3 row-wrap behavior still applies. */
+  @media (max-width: 1024px) {
+    :root {
+      --pad-body:        var(--space-4);
+      --pad-panel-y:     var(--space-4);
+      --pad-panel-x:     var(--space-5);
+      --pad-hdr-y:       var(--space-4);
+      --pad-hdr-x:       var(--space-6);
+      --pad-hdr-x-l:     var(--space-6);
+      --gap-panels:      var(--space-3);
+    }
+    /* Release the viewport-lock so panels can stack and scroll. */
+    html, body { overflow: hidden auto; height: auto; min-height: 100dvh; }
+    .grid { grid-template-columns: 1fr 1fr; }
+    /* col 3 already spans full width via the ≤1400 rule; keep it row-flexed. */
+  }
+
+  /* Mobile (≤640px) — single col, hide MOCK-only panels.
+     640 was 900: bumped down so iPad mini portrait (744) hits tablet, not mobile. */
+  @media (max-width: 640px) {
+    :root {
+      --pad-body:        var(--space-4);
+      --pad-hdr-y:       var(--space-3);
+      --pad-hdr-x:       var(--space-5);
+      --pad-hdr-x-l:     var(--space-5);
+      --fs-hdr-chip:     var(--fs-2xs);
+      --fs-hdr-display:  var(--fs-display-sm);
+      --fs-ticker:       var(--fs-xs);
+    }
     .grid { grid-template-columns: 1fr; }
     .grid > .col:nth-child(3) { flex-direction: column; }
     #panel-sessions { display: none; }
     #weather, .hdr .right .sys, .sys-spark-wrap { display: none; }
-    .hdr { font-size: 9px; padding: 6px 10px; }
-    .hdr .center { font-size: 20px; }
-    .ticker { font-size: 10px; }
+  }
+
+  /* Respect prefers-reduced-motion — kill infinite/large-motion animations
+     while keeping micro-transitions (color/border 0.1–0.12s) intact.
+     Vestibular-sensitive users get a static page; everyone else sees the
+     usual REC pulse, ticker scroll, radar sweep, and blink cursor. */
+  @media (prefers-reduced-motion: reduce) {
+    .rec-dot,
+    .blink-cursor::after,
+    .ticker-track,
+    .rail-radar .sweep {
+      animation: none;
+    }
+  }
+
+  /* Touch devices (iPad, iPhone) — enlarge tap targets and drop
+     hover-only feedback that fires on first tap and lingers. */
+  @media (hover: none) and (pointer: coarse) {
+    :root {
+      --pad-tab-y: 10px;
+      --pad-tab-x: var(--space-7);
+    }
+    /* Hover lifts on data-url rows fire on first tap and stick; kill them. */
+    [data-url]:hover { background: transparent; }
+    [data-url]:hover .title, [data-url]:hover .pr-title { color: var(--primary); }
+    .theme-chip:hover { color: var(--cyan); border-color: var(--rule); background: transparent; }
+    /* Chip tap targets — push to a comfortable ~36px without breaking density. */
+    .theme-chip, .op-status { padding: var(--space-3) var(--space-5); }
+    .procs-toggle .t { padding: var(--space-2) var(--space-4); }
   }
 </style>
 </head>
 <body>
+<script>
+  // Apply saved theme synchronously before any visible paint to avoid flash.
+  // If no saved theme but OS prefers light, default to tron-light (the
+  // light theme closest in spirit to NIGHTOPS — restrained ops-console).
+  // User's explicit pick via the THEME chip always wins (saved in localStorage).
+  (function () {
+    try {
+      var t = localStorage.getItem('cw-theme');
+      if (t) {
+        document.body.classList.add(t);
+      } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        document.body.classList.add('theme-tron-light');
+      }
+    } catch (e) { /* localStorage or matchMedia blocked — fall through to default */ }
+  })();
+</script>
 <div class="offline-overlay"></div>
 
 <!-- LEFT RAIL (4K only — decorative trace freq + radar) -->
@@ -766,6 +1211,9 @@
       <span class="rec-dot"></span>
       <span class="op-prefix">OPERATOR://</span><span class="op-name">DEVON</span>
       <span class="op-status" id="connection">ON STATION</span>
+      <span class="theme-chip" id="theme-chip" title="Click or press T to cycle themes">
+        <span class="label">THEME</span><span id="theme-name">NIGHTOPS</span>
+      </span>
     </div>
     <div class="center" id="clock">--:--:--</div>
     <div class="right">
@@ -792,6 +1240,14 @@
           <span class="meta" id="services-meta">—</span>
         </div>
         <div id="services-body" class="dim">Loading…</div>
+      </div>
+
+      <div class="panel" id="panel-network">
+        <div class="panel-title">
+          <span class="ttl">NETWORK</span>
+          <span class="meta" id="network-meta">—</span>
+        </div>
+        <div id="network-body" class="dim">Loading…</div>
       </div>
 
       <div class="panel" id="panel-claude">
@@ -831,6 +1287,14 @@
 
       <!-- Linear workspaces — one panel per [[linear]] block, populated by renderLinear() -->
       <div id="linear-panels"></div>
+
+      <div class="panel grow" id="panel-scratch">
+        <div class="panel-title">
+          <span class="ttl">SCRATCHPAD</span>
+          <span class="meta" id="scratch-meta">—</span>
+        </div>
+        <textarea id="scratch-body" class="scratch" spellcheck="false" placeholder="local notes — autosaved to ~/.cowork-dash/scratchpad.txt"></textarea>
+      </div>
     </div>
 
     <!-- RIGHT COL: GitHub, Heatmap -->
@@ -850,6 +1314,17 @@
           <div id="github-body" class="dim">Loading…</div>
         </div>
         <span class="panel-stamp">LK-R3 · SP1-7</span>
+      </div>
+
+      <div class="panel" id="panel-procs">
+        <div class="panel-title">
+          <span class="ttl">TOP PROCS</span>
+          <span class="procs-toggle" id="procs-toggle">
+            <span class="t active" data-procs-tab="cpu">CPU</span>
+            <span class="t" data-procs-tab="mem">MEM</span>
+          </span>
+        </div>
+        <div id="procs-body" class="dim">Loading…</div>
       </div>
 
       <div class="panel grow" id="panel-heatmap">
@@ -1026,7 +1501,8 @@ function renderTasks(p) {
   const rows = items.map(t => {
     const pri = t.priority === 'high' ? '!' : ' ';
     const dueCls = t.due === 'TODAY' ? 'warn' : (/\d+D$/.test(t.due || '') ? 'alert' : 'dim');
-    return `<div class="task">
+    const urlAttr = t.url ? ` data-url="${escapeHtml(t.url)}"` : '';
+    return `<div class="task"${urlAttr}>
       <span class="pri">${pri}</span>
       <span class="src">${escapeHtml(t.source || '')}</span>
       <span class="title">${escapeHtml(t.title || '')}</span>
@@ -1192,7 +1668,8 @@ function renderLinearPanel(label, safe, p) {
                     : (it.due === 'OVERDUE' ? 'alert'
                     : (/\d+D$/.test(it.due || '') ? 'alert' : 'dim'));
       const ident = it.identifier ? '<span class="dim">' + escapeHtml(it.identifier) + '</span> ' : '';
-      return '<div class="task">'
+      const urlAttr = it.url ? ' data-url="' + escapeHtml(it.url) + '"' : '';
+      return '<div class="task"' + urlAttr + '>'
         + '<span class="pri">' + pri + '</span>'
         + '<span class="src">' + escapeHtml(it.team || '') + '</span>'
         + '<span class="title">' + ident + escapeHtml(it.title || '') + '</span>'
@@ -1208,30 +1685,36 @@ let githubTab = 'overview';
 let githubLast = null;
 
 function ghPrList(items, emptyMsg) {
-  if (!items || !items.length) return `<div class="dim" style="margin-top:6px">${emptyMsg}</div>`;
-  return items.map(pr => `
-    <div class="pr-item">
-      <span class="pr-title">#${pr.number} ${escapeHtml(pr.title)}${pr.draft ? ' <span class="dim" style="font-size:10px">[draft]</span>' : ''}</span>
+  if (!items || !items.length) return `<div class="dim" style="margin-top:var(--space-3)">${emptyMsg}</div>`;
+  return items.map(pr => {
+    const urlAttr = pr.url ? ` data-url="${escapeHtml(pr.url)}"` : '';
+    return `
+    <div class="pr-item"${urlAttr}>
+      <span class="pr-title">#${pr.number} ${escapeHtml(pr.title)}${pr.draft ? ' <span class="dim" style="font-size:var(--fs-xs)">[draft]</span>' : ''}</span>
       <span class="pr-repo">${escapeHtml(pr.repo || '')}</span>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function ghIssueList(items, emptyMsg) {
-  if (!items || !items.length) return `<div class="dim" style="margin-top:6px">${emptyMsg}</div>`;
-  return items.map(i => `
-    <div class="pr-item">
+  if (!items || !items.length) return `<div class="dim" style="margin-top:var(--space-3)">${emptyMsg}</div>`;
+  return items.map(i => {
+    const urlAttr = i.url ? ` data-url="${escapeHtml(i.url)}"` : '';
+    return `
+    <div class="pr-item"${urlAttr}>
       <span class="pr-title">#${i.number} ${escapeHtml(i.title)}</span>
       <span class="pr-repo">${escapeHtml(i.repo || '')}</span>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function ghActivityList(items) {
-  if (!items || !items.length) return '<div class="dim" style="margin-top:6px">no recent activity</div>';
+  if (!items || !items.length) return '<div class="dim" style="margin-top:var(--space-3)">no recent activity</div>';
   return items.map(ev => `
     <div class="pr-item">
-      <span class="pr-title"><span class="dim" style="font-size:10px">[${escapeHtml(ev.kind || '?')}]</span> ${escapeHtml(ev.detail || '')}</span>
+      <span class="pr-title"><span class="dim" style="font-size:var(--fs-xs)">[${escapeHtml(ev.kind || '?')}]</span> ${escapeHtml(ev.detail || '')}</span>
       <span class="pr-repo">${escapeHtml(ev.repo || '')} · ${timeAgo(ev.at)}</span>
     </div>
   `).join('');
@@ -1248,7 +1731,7 @@ function renderGithubView(p) {
     return `
       <div class="row"><span class="dim">Awaiting my review</span><span class="${rr.count > 0 ? 'warn' : 'ok'}">${rr.count}</span></div>
       ${ghPrList(rr.items, 'queue is clear')}
-      <div class="row" style="margin-top:8px"><span class="dim">My open PRs</span><span>${my.count}</span></div>
+      <div class="row" style="margin-top:var(--space-4)"><span class="dim">My open PRs</span><span>${my.count}</span></div>
       ${ghPrList(my.items, 'no open PRs')}
     `;
   }
@@ -1264,7 +1747,7 @@ function renderGithubView(p) {
   // overview
   let prList = '';
   if (rr.items && rr.items.length) {
-    prList = '<div class="dim" style="margin-top:6px;font-size:11px">REVIEW REQUESTED</div>' + ghPrList(rr.items, '');
+    prList = '<div class="dim" style="margin-top:var(--space-3);font-size:var(--fs-sm)">REVIEW REQUESTED</div>' + ghPrList(rr.items, '');
   }
   return `
     <div class="row"><span class="dim">PRs awaiting review</span><span class="${rr.count > 0 ? 'warn' : 'ok'}">${rr.count}</span></div>
@@ -1337,11 +1820,11 @@ function renderHeatmap(p) {
     <div class="heatmap">${grid.join('')}</div>
     <div class="heatmap-legend">
       less
-      <span class="sq" style="background:rgba(95,200,232,0.18)"></span>
-      <span class="sq" style="background:rgba(95,200,232,0.38)"></span>
-      <span class="sq" style="background:rgba(95,200,232,0.60)"></span>
-      <span class="sq" style="background:rgba(95,200,232,0.82)"></span>
-      <span class="sq" style="background:#5fc8e8"></span>
+      <span class="sq l1"></span>
+      <span class="sq l2"></span>
+      <span class="sq l3"></span>
+      <span class="sq l4"></span>
+      <span class="sq l5"></span>
       more
     </div>
   `);
@@ -1482,6 +1965,147 @@ function renderTicker(events) {
 
 let lastTickerLen = -1;
 
+//------------------------------------------------------------------
+// Network panel — WAN ip / ISP / region / VPN
+//------------------------------------------------------------------
+
+function renderNetwork(p) {
+  setMeta('network-meta', p);
+  if (!p || p.status === 'pending') { setHtml('network-body', '<div class="dim">loading…</div>'); return; }
+  if (p.status === 'error' && !p.wan_ip) {
+    // ipinfo failed and we have no cached value — still show VPN state if any
+    const vpnTxt = p.vpn_active ? 'ON' : 'OFF';
+    const vpnCls = p.vpn_active ? 'warn' : 'dim';
+    setHtml('network-body',
+      '<div class="err">' + escapeHtml(p.error || 'error') + '</div>' +
+      '<div class="net-row"><span class="k">VPN</span><span class="v ' + vpnCls + '">' + vpnTxt + '</span></div>'
+    );
+    return;
+  }
+  const vpnActive = !!p.vpn_active;
+  const vpnLine = vpnActive
+    ? (p.vpn_ifaces || []).map(i => escapeHtml(i.iface) + ' ' + escapeHtml(i.ip)).join(', ') || 'ON'
+    : 'OFF';
+  const rows = [
+    ['WAN',    escapeHtml(p.wan_ip || '—'), 'ok'],
+    ['ISP',    escapeHtml((p.isp || '').trim() || '—'), ''],
+    ['REGION', escapeHtml(p.region || '—'), ''],
+    ['ASN',    escapeHtml(p.asn || '—'), ''],
+    ['VPN',    vpnLine, vpnActive ? 'warn' : 'dim'],
+  ];
+  setHtml('network-body', rows.map(([k, v, cls]) =>
+    '<div class="net-row"><span class="k">' + k + '</span><span class="v ' + (cls || '') + '">' + v + '</span></div>'
+  ).join(''));
+}
+
+//------------------------------------------------------------------
+// Top processes panel — tabbed CPU/MEM
+//------------------------------------------------------------------
+
+let procsTab = 'cpu';
+
+function renderProcs(sys) {
+  setMeta('procs-meta', sys);
+  if (!sys || sys.status === 'pending') { setHtml('procs-body', '<div class="dim">loading…</div>'); return; }
+  const list = procsTab === 'cpu' ? (sys.top_cpu || []) : (sys.top_mem || []);
+  if (!list.length) { setHtml('procs-body', '<div class="dim">no data</div>'); return; }
+  const unit = procsTab === 'cpu' ? '%' : '%';
+  const valKey = procsTab === 'cpu' ? 'cpu' : 'mem';
+  setHtml('procs-body', list.map(r =>
+    '<div class="proc-row">' +
+      '<span class="name">' + escapeHtml(r.name || '?') + '</span>' +
+      '<span class="pid">' + escapeHtml(String(r.pid ?? '')) + '</span>' +
+      '<span class="val">' + (r[valKey] ?? 0).toFixed(1) + unit + '</span>' +
+    '</div>'
+  ).join(''));
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-procs-tab]');
+  if (!t) return;
+  procsTab = t.dataset.procsTab;
+  document.querySelectorAll('#procs-toggle .t').forEach(x =>
+    x.classList.toggle('active', x.dataset.procsTab === procsTab)
+  );
+  // Re-render immediately from the last-seen system blob — no need to wait
+  // for the next 5s poll.
+  if (lastSystem) renderProcs(lastSystem);
+});
+
+let lastSystem = null;
+
+//------------------------------------------------------------------
+// Scratchpad — debounced autosave to ~/.cowork-dash/scratchpad.txt
+//------------------------------------------------------------------
+
+let scratchSaveTimer = null;
+let scratchLoaded = false;
+
+async function loadScratchpad() {
+  try {
+    const r = await fetch('/api/scratchpad', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    const ta = el('scratch-body');
+    if (ta && !scratchLoaded) {
+      // Only seed the textarea if the user hasn't started typing yet — avoids
+      // clobbering a race where the user fires off a character before the GET
+      // returns.
+      if (!ta.value) ta.value = j.content || '';
+      scratchLoaded = true;
+      setText('scratch-meta', (ta.value.length || 0) + ' chars');
+    }
+  } catch (e) {
+    setText('scratch-meta', 'load err');
+    console.warn('scratchpad load failed:', e);
+  }
+}
+
+async function saveScratchpad() {
+  const ta = el('scratch-body');
+  if (!ta) return;
+  // POSTs to a localhost endpoint are cheap; if two race the latest one wins,
+  // which is what the user wants.
+  setText('scratch-meta', 'saving…');
+  try {
+    const r = await fetch('/api/scratchpad', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: ta.value }),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    setText('scratch-meta', ta.value.length + ' chars');
+  } catch (e) {
+    setText('scratch-meta', 'save err');
+    console.warn('scratchpad save failed:', e);
+  }
+}
+
+(function wireScratchpad() {
+  const ta = el('scratch-body');
+  if (!ta) return;
+  ta.addEventListener('input', () => {
+    if (!scratchLoaded) return;  // don't write back the placeholder before load completes
+    if (scratchSaveTimer) clearTimeout(scratchSaveTimer);
+    setText('scratch-meta', 'editing…');
+    scratchSaveTimer = setTimeout(saveScratchpad, 600);
+  });
+})();
+
+//------------------------------------------------------------------
+// Click-to-open for any row carrying data-url
+//------------------------------------------------------------------
+
+document.addEventListener('click', e => {
+  const row = e.target.closest('[data-url]');
+  if (!row) return;
+  const url = row.dataset.url;
+  if (!url) return;
+  // _blank lets macOS Universal Links route to the desktop app for Linear /
+  // Motion if installed, and otherwise opens a new browser tab.
+  window.open(url, '_blank', 'noopener,noreferrer');
+});
+
 async function poll() {
   try {
     const r = await fetch('/api/state.json', { cache: 'no-store' });
@@ -1492,6 +2116,7 @@ async function poll() {
 
     const p = s.providers || {};
     renderServices(p.services);
+    renderNetwork(p.network);
     renderClaude(p.claude);
     renderSessions(p.claude);
     renderCalendar(p.calendar);
@@ -1500,6 +2125,8 @@ async function poll() {
     renderGithub(p.github);
     renderHeatmap(p.github);
     renderSystem(p.system);
+    lastSystem = p.system;
+    renderProcs(p.system);
     renderRail(p.system);
     renderLeftRail(p);
 
@@ -1515,6 +2142,50 @@ async function poll() {
 }
 
 //------------------------------------------------------------------
+// Theme cycler
+//------------------------------------------------------------------
+
+// Ordered cycle. First entry has no class (NIGHTOPS = default :root palette).
+const THEMES = [
+  { cls: '',                       label: 'NIGHTOPS' },
+  { cls: 'theme-tron-dark',        label: 'TRON·DARK' },
+  { cls: 'theme-tron-light',       label: 'TRON·LIGHT' },
+  { cls: 'theme-cyberpunk-dark',   label: 'CYBER·DARK' },
+  { cls: 'theme-cyberpunk-light',  label: 'CYBER·LIGHT' },
+];
+
+function currentThemeIndex() {
+  for (let i = 0; i < THEMES.length; i++) {
+    if (THEMES[i].cls && document.body.classList.contains(THEMES[i].cls)) return i;
+  }
+  return 0;
+}
+
+function applyTheme(idx) {
+  const next = THEMES[((idx % THEMES.length) + THEMES.length) % THEMES.length];
+  // Strip every known theme class, then add the target (skip empty NIGHTOPS class).
+  THEMES.forEach(t => { if (t.cls) document.body.classList.remove(t.cls); });
+  if (next.cls) document.body.classList.add(next.cls);
+  setText('theme-name', next.label);
+  try { localStorage.setItem('cw-theme', next.cls); } catch (e) { /* ignore */ }
+}
+
+function cycleTheme(delta = 1) {
+  applyTheme(currentThemeIndex() + delta);
+}
+
+// Init label on load (theme class itself was applied pre-paint by the inline script).
+applyTheme(currentThemeIndex());
+
+el('theme-chip').addEventListener('click', () => cycleTheme(1));
+document.addEventListener('keydown', (e) => {
+  // Skip when typing in scratchpad / other inputs.
+  const t = e.target;
+  if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT')) return;
+  if (e.key === 't' || e.key === 'T') cycleTheme(e.shiftKey ? -1 : 1);
+});
+
+//------------------------------------------------------------------
 // Boot
 //------------------------------------------------------------------
 
@@ -1523,6 +2194,7 @@ setInterval(renderClock, 1000);
 
 poll();
 setInterval(poll, 5000);
+loadScratchpad();
 </script>
 </body>
 </html>
