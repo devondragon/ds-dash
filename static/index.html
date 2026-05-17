@@ -1080,6 +1080,20 @@
     [id^="linear-body-"] .task ~ .task ~ .task ~ .task ~ .task ~ .task {
       display: none;
     }
+
+    /* Layout: at narrow widths, col-2 is height-pressured. The default
+       `.panel.grow { flex: 1 }` shorthand is `flex: 1 1 0%` — grow panels
+       start at 0 height and only get *surplus* space. When Cal + Linear's
+       natural content already fills the column, Tasks/Scratch end up with
+       zero allotment and clip to nothing. Use `flex: 1 1 auto` so grow
+       panels start at their content height and shrink proportionally if
+       the column is short, guaranteeing Tasks gets some visible height. */
+    .panel.grow { flex: 1 1 auto; }
+    /* The Linear panels live inside a #linear-panels wrapper (plain div,
+       not a flex container) which makes their .grow flex props inert in
+       col-2's flex context. display:contents collapses the wrapper so
+       each Linear panel participates as a direct flex child of col-2. */
+    #linear-panels { display: contents; }
   }
 
   /* Tablet (≤1024px) — covers iPad mini/standard/Pro 11/13 portrait
