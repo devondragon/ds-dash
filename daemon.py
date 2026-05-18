@@ -125,9 +125,13 @@ async def github_poll(token: str, username: str, interval: int) -> None:
     prev_total = None
     while True:
         result: dict[str, Any] = {"username": username, "updated_at": _now_iso()}
+        # Tag of the in-flight call; surfaced in error messages so a transient
+        # failure tells us which of the five endpoints actually broke.
+        current_call: str = ""
         try:
             async with httpx.AsyncClient(timeout=30, headers=headers) as c:
                 # PRs awaiting my review
+                current_call = "search/issues (review-requested)"
                 r1 = await c.get(
                     f"{GITHUB_API}/search/issues",
                     params={"q": f"is:open is:pr review-requested:{username} archived:false", "per_page": 10},
@@ -149,6 +153,7 @@ async def github_poll(token: str, username: str, interval: int) -> None:
                 }
 
                 # PRs I authored, still open
+                current_call = "search/issues (my open PRs)"
                 r2 = await c.get(
                     f"{GITHUB_API}/search/issues",
                     params={"q": f"is:open is:pr author:{username} archived:false", "per_page": 10},
@@ -171,6 +176,7 @@ async def github_poll(token: str, username: str, interval: int) -> None:
                 }
 
                 # Issues assigned to me
+                current_call = "search/issues (assigned to me)"
                 r3 = await c.get(
                     f"{GITHUB_API}/search/issues",
                     params={"q": f"is:open is:issue assignee:{username} archived:false", "per_page": 10},
@@ -192,6 +198,7 @@ async def github_poll(token: str, username: str, interval: int) -> None:
                 }
 
                 # Recent public events (for ACTIVITY tab)
+                current_call = "users/<login>/events"
                 r5 = await c.get(
                     f"{GITHUB_API}/users/{username}/events",
                     params={"per_page": 12},
@@ -202,6 +209,7 @@ async def github_poll(token: str, username: str, interval: int) -> None:
                 }
 
                 # Contribution heatmap via GraphQL
+                current_call = "graphql (contribution heatmap)"
                 r4 = await c.post(
                     GITHUB_GRAPHQL,
                     json={"query": GRAPHQL_CONTRIBUTIONS, "variables": {"login": username}},
@@ -232,15 +240,16 @@ async def github_poll(token: str, username: str, interval: int) -> None:
             result["status"] = "ok"
             STATE["providers"]["github"] = result
         except httpx.HTTPStatusError as e:
+            body = e.response.text[:200].strip() or "(empty body)"
             STATE["providers"]["github"] = {
                 "status": "error",
-                "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}",
+                "error": f"HTTP {e.response.status_code} on {current_call or 'unknown'}: {body}",
                 "updated_at": _now_iso(),
             }
         except Exception as e:
             STATE["providers"]["github"] = {
                 "status": "error",
-                "error": f"{type(e).__name__}: {e}",
+                "error": f"{type(e).__name__} on {current_call or 'unknown'}: {e}",
                 "updated_at": _now_iso(),
             }
         await asyncio.sleep(interval)
