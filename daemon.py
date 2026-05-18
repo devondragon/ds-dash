@@ -1472,9 +1472,21 @@ if STATIC_DIR.exists():
 def main() -> None:
     import uvicorn
     cfg = load_config()
-    port = (cfg.get("server") or {}).get("port", 7766)
-    print(f"[cowork-dash] listening on http://localhost:{port}")
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
+    server_cfg = cfg.get("server") or {}
+    port = server_cfg.get("port", 7766)
+    # Default to loopback only — this dashboard has no auth and surfaces
+    # private data (GitHub, calendar, scratchpad). Set [server].host to
+    # "0.0.0.0" or a specific LAN IP only on a trusted network.
+    host = server_cfg.get("host", "127.0.0.1")
+    if host not in ("127.0.0.1", "localhost"):
+        print(
+            f"[cowork-dash] WARNING: binding to {host} exposes this dashboard "
+            "(GitHub data, calendar, scratchpad — no auth) to anyone who can "
+            "reach this host on the network. Use only on a trusted LAN.",
+            file=sys.stderr,
+        )
+    print(f"[cowork-dash] listening on http://{host}:{port}")
+    uvicorn.run(app, host=host, port=port, log_level="info")
 
 
 if __name__ == "__main__":

@@ -4,6 +4,12 @@
 [server]
 # Port the daemon listens on. Open http://localhost:PORT in any browser tab.
 port = 7766
+# Bind address. Default "127.0.0.1" = loopback only (recommended). Set to
+# "0.0.0.0" or a specific LAN IP (e.g. "192.168.1.42") to access the
+# dashboard from other devices on your network — only do this on a
+# trusted LAN, since the daemon has no auth and exposes private data
+# (GitHub, calendar, scratchpad).
+# host = "127.0.0.1"
 
 [ui]
 # Label shown in the header strip ("OPERATOR://NAME"). If unset, falls back
