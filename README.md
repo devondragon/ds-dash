@@ -1,12 +1,16 @@
 # cowork-dash
 
 A local personal dashboard. Cyberpunk-themed single-pane-of-glass for
-GitHub, calendar, tasks, Linear, Claude Code usage, service status, and
-system stats. Runs as a small Python daemon on `localhost`; the frontend
-is one static HTML page.
+GitHub, calendar, tasks, Linear, Claude Code usage, service status,
+weather, and system stats. Runs as a small Python daemon on `localhost`;
+the frontend is one static HTML page — no build step.
 
-macOS-first (calendar reads via `ical-buddy`, Claude usage reads OAuth
-creds from the macOS Keychain). Other panels work cross-platform.
+Requires Python 3.10+. macOS-first (calendar reads via `ical-buddy`,
+Claude Code OAuth has a macOS Keychain fallback); on Linux the calendar
+panel is unavailable and Claude usage needs
+`~/.claude/.credentials.json` on disk. Everything else (GitHub, Motion,
+Linear, services, system, network, weather, scratchpad) is
+cross-platform.
 
 ## Install + run
 
@@ -14,13 +18,16 @@ creds from the macOS Keychain). Other panels work cross-platform.
 ./run.sh
 ```
 
-First run creates `.venv/`, installs deps, and copies a starter config to
-`~/.cowork-dash/config.toml`. Edit that file (at minimum add a GitHub
-token + username), then re-run. The dashboard is served at
-<http://localhost:7766>.
+First run creates `.venv/`, installs deps, and copies a starter config
+to `~/.cowork-dash/config.toml`. The dashboard runs at
+<http://localhost:7766> with the panels you've configured live and the
+rest showing `OFFLINE` — you can run it with zero credentials and it
+still surfaces services, system stats, network, and weather (after you
+add a zip code).
 
-A fine-grained GitHub PAT with read-only access to **Issues**, **Pull
-requests**, and **Metadata** is enough. See `config.example.toml` for the
+To light up GitHub, the most popular panel, add a fine-grained personal
+access token with read-only access to **Issues**, **Pull requests**, and
+**Metadata** to the `[github]` block. See `config.example.toml` for the
 full list of provider blocks.
 
 ## Network access
@@ -62,6 +69,8 @@ just shows `OFFLINE` and the rest of the dashboard works normally.
   `Claude Code-credentials` keychain item.
 - **Network** — works without a token (free ipinfo.io tier, ~1k/day).
   Add `[network].ipinfo_token` for more headroom.
+- **Weather** — set `[weather].zip` to a postal code (default country
+  is `US`). No API key required — uses zippopotam.us + Open-Meteo.
 
 See the providers table below for the full source/needs mapping.
 
@@ -84,6 +93,7 @@ many panels live as you like.
 | CC sessions    | scan of `~/.claude/projects/**/*.jsonl`                                | Claude Code installed            |
 | System stats   | `psutil` (CPU, mem, disk, net, processes)                              | nothing                          |
 | Network        | local interfaces + ipinfo.io                                           | optional ipinfo token            |
+| Weather        | zippopotam.us (geocode) + Open-Meteo (forecast)                        | postal code in config            |
 
 The macOS Keychain access for Claude usage uses the standard `security`
 CLI to read your own credentials — same item `claude` itself reads.
@@ -102,7 +112,18 @@ Nothing is written back.
 
 [Apache 2.0](LICENSE).
 
+## Contributing
+
+This is a personal-scratch dashboard, so the maintenance bar is low —
+issues and small PRs are welcome but no SLAs implied. New providers
+should follow the polling pattern documented in
+[`CLAUDE.md`](CLAUDE.md); see [`CONTRIBUTING.md`](CONTRIBUTING.md) for
+specifics. Security-sensitive reports: see
+[`SECURITY.md`](SECURITY.md).
+
 ## Architecture
 
-See `CLAUDE.md` for the provider polling pattern, status vocabulary,
-frontend rendering conventions, and how to add a new panel.
+See [`CLAUDE.md`](CLAUDE.md) for the provider polling pattern, status
+vocabulary, and how to add a new panel.
+[`docs/FRONTEND.md`](docs/FRONTEND.md) covers layout, render
+conventions, the NIGHTOPS design tokens, and responsive breakpoints.
