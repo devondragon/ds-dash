@@ -1806,7 +1806,11 @@ async def health():
     return {"ok": True, "started_at": STATE["started_at"]}
 
 
-# Cap scratchpad to a sane size so a runaway client can't fill the disk.
+# Scratchpad endpoints are unauthenticated like the rest of the API — access
+# control is the daemon's bind address ([server].host, loopback by default).
+# Anyone who can reach the daemon can read and overwrite the scratchpad file,
+# so only expose this on a trusted network. Size cap below stops a runaway
+# client from filling the disk.
 _SCRATCHPAD_MAX_BYTES = 256 * 1024
 
 
