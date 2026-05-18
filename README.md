@@ -23,6 +23,28 @@ A fine-grained GitHub PAT with read-only access to **Issues**, **Pull
 requests**, and **Metadata** is enough. See `config.example.toml` for the
 full list of provider blocks.
 
+## Network access
+
+The daemon binds to `127.0.0.1` (loopback only) by default, so the
+dashboard is reachable only from the host machine. To open it on another
+device on your network — e.g. an iPad in the same room — set
+`[server].host` in `~/.cowork-dash/config.toml`:
+
+```toml
+[server]
+port = 7766
+host = "0.0.0.0"           # all interfaces (simplest)
+# host = "192.168.1.42"    # or pin to one specific LAN IP
+```
+
+Then restart the daemon and open `http://<laptop-LAN-IP>:7766/` on the
+other device.
+
+> ⚠️ The dashboard has no authentication and surfaces private data
+> (GitHub, calendar, Linear, Motion, scratchpad — the scratchpad endpoint
+> is even writable). The daemon prints a startup warning whenever it
+> binds to anything other than loopback. Use only on a trusted LAN.
+
 ## Optional setup
 
 Everything below is optional — any provider whose credentials are missing
