@@ -2,12 +2,16 @@
 """
 cowork-dash: local dashboard daemon.
 
-Polls configured providers on a schedule and exposes their state at
-GET /api/state.json. Also serves a static HTML frontend at /.
+One FastAPI app, one in-memory STATE dict, one background asyncio task
+per configured provider. Each provider writes to STATE["providers"][name]
+with at least {status, updated_at}; the frontend polls GET /api/state.json
+every 5s and renders defensively against missing fields.
 
-For v0 we wire up GitHub for real and return mock data for the other
-panels so the frontend layout is complete end-to-end. Replace each
-`_mock_*` function with a real poller as we add providers.
+The static frontend (HTML/CSS/JS) is served from ./static via a StaticFiles
+mount. Cross-cutting events go to STATE["ticker"] via _push_ticker().
+
+See CLAUDE.md for the provider polling pattern, status vocabulary, and how
+to add a new panel.
 """
 from __future__ import annotations
 
@@ -861,26 +865,6 @@ async def motion_poll(api_key: str, interval: int = 60) -> None:
         await asyncio.sleep(interval)
 
 
-# Legacy mock kept for reference; not started by lifespan when [motion].api_key is set.
-async def mock_tasks_poll() -> None:
-    """Mocked unified task list until Motion + Linear are wired up."""
-    while True:
-        STATE["providers"]["tasks"] = {
-            "status": "mocked",
-            "updated_at": _now_iso(),
-            "open_count": 11,
-            "items": [
-                {"source": "MOT", "title": "Ship dashboard v0", "due": "TODAY", "priority": "high"},
-                {"source": "GH",  "title": "Review PR #2841",  "due": "3D",    "priority": "high"},
-                {"source": "LIN", "title": "ENG-412 Fix race condition", "due": "P2", "priority": "med"},
-                {"source": "LIN", "title": "ENG-419 Add rate limits",    "due": "P3", "priority": "med"},
-                {"source": "MOT", "title": "Reply to investor email",    "due": "TUE", "priority": "med"},
-                {"source": "LIN", "title": "ENG-401 Spike auth provider","due": "P3", "priority": "low"},
-            ],
-        }
-        await asyncio.sleep(30)
-
-
 # --------------------------------------------------------------------------- #
 # Linear provider (real — api.linear.app GraphQL)
 # --------------------------------------------------------------------------- #
@@ -1329,22 +1313,6 @@ async def claude_poll(interval: int = 300) -> None:
         await asyncio.sleep(interval)
 
 
-# Legacy mock kept for reference; not started by lifespan.
-async def mock_claude_poll() -> None:
-    """Original drift mock — superseded by claude_poll."""
-    while True:
-        five = 60 + int(20 * abs(_sin_seconds(0.001)))
-        weekly = 45 + int(15 * abs(_sin_seconds(0.0003, phase=1.0)))
-        STATE["providers"]["claude"] = {
-            "status": "mocked",
-            "updated_at": _now_iso(),
-            "five_hour": {"percent": five, "resets_at": (datetime.now() + timedelta(hours=4)).strftime("%H:%M")},
-            "weekly":    {"percent": weekly, "resets_at": "MON 00:00"},
-            "cc_sessions": {"live": 3, "idle": 1},
-        }
-        await asyncio.sleep(15)
-
-
 NET_HISTORY_SIZE = 60  # 60 samples * 5s = 5min of net trace at the default poll interval
 
 
@@ -1561,11 +1529,6 @@ async def network_poll(token: str | None = None, interval: int = 300) -> None:
                 "vpn_ifaces": _detect_vpn_interfaces(),
             }
         await asyncio.sleep(interval)
-
-
-def _sin_seconds(rate: float, phase: float = 0.0) -> float:
-    """Smooth oscillator based on wall clock. Used by mock providers."""
-    return math.sin(datetime.now().timestamp() * rate + phase)
 
 
 # --------------------------------------------------------------------------- #

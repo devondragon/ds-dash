@@ -148,7 +148,7 @@ Current defaults:
 | calendar | 60s      | "next event" needs minute-level freshness               |
 | motion   | 60s      | API rate-limit friendly; tasks change at minute scale   |
 | linear   | 90s      | per-workspace; complexity-based rate limit, well under budget |
-| claude   | 60s      | full `~/.claude` scan; not worth more frequent          |
+| claude   | 300s     | each poll burns one Anthropic API token (1-token probe) |
 | system   | 5s       | local + cheap, feeds net-trace history samples          |
 
 Anything hitting a third-party API: minimum 30s, prefer 60s+. Local-only:
@@ -196,17 +196,17 @@ architecture, and panel chrome.
 
 ## Current provider state
 
-All eight panels are real:
+Every provider is real — there are no mock pollers in the codebase.
 
 | panel         | source                                                                    |
 |---------------|---------------------------------------------------------------------------|
-| github        | api.github.com (PAT in config)                                            |
+| github        | api.github.com (PAT in config) — REST search + GraphQL contributions      |
 | services      | public status.json endpoints (Anthropic / OpenAI / GH / Linear / Vercel)  |
 | system        | psutil — cpu, mem, disk, net (+ 5-min rolling history for trace)          |
-| calendar      | ical-buddy (Homebrew, auto-detected)                                      |
+| calendar      | ical-buddy (Homebrew, auto-detected on macOS)                             |
 | tasks         | api.usemotion.com /v1/tasks (with recurring-template dedup)               |
 | linear        | api.linear.app GraphQL — one [[linear]] block per workspace, separate panel each |
-| claude usage  | scan of `~/.claude/projects/**/*.jsonl` for user-message timestamps       |
-| cc sessions   | same scan, jsonl mtime → live / idle / today                              |
+| claude usage  | Anthropic rate-limit headers via 1-token probe; OAuth from disk / keychain |
+| cc sessions   | scan of `~/.claude/projects/**/*.jsonl` — jsonl mtime → live / idle / today |
 
 Planned but not yet shipped: gmail.
