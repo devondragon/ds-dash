@@ -86,6 +86,12 @@ poll_seconds = 5
 # ipinfo_token = "..."
 poll_seconds = 300
 
-# [claude_code]
-# # Directory to scan for active CC sessions
-# sessions_dir = "~/Library/Application Support/Claude/local-agent-mode-sessions"
+[weather]
+# Header weather chip. Two keyless APIs in series: zippopotam.us resolves
+# the postal code to lat/lon once at startup, then Open-Meteo provides the
+# current temperature + WMO condition.
+# zip = "94110"           # required to enable the chip
+# country = "US"          # ISO-3166-1 alpha-2; default US
+# units = "F"             # "F" or "C"; default F
+# label = "HQ"            # override the displayed location (defaults to city)
+poll_seconds = 900        # weather doesn't move fast; 15 min is plenty

@@ -149,6 +149,8 @@ Current defaults:
 | motion   | 60s      | API rate-limit friendly; tasks change at minute scale   |
 | linear   | 90s      | per-workspace; complexity-based rate limit, well under budget |
 | claude   | 300s     | each poll burns one Anthropic API token (1-token probe) |
+| network  | 300s     | ipinfo.io free tier is ~1k/day; 288/day at this rate    |
+| weather  | 900s     | weather moves slowly; Open-Meteo is generous regardless |
 | system   | 5s       | local + cheap, feeds net-trace history samples          |
 
 Anything hitting a third-party API: minimum 30s, prefer 60s+. Local-only:
@@ -208,5 +210,7 @@ Every provider is real — there are no mock pollers in the codebase.
 | linear        | api.linear.app GraphQL — one [[linear]] block per workspace, separate panel each |
 | claude usage  | Anthropic rate-limit headers via 1-token probe; OAuth from disk / keychain |
 | cc sessions   | scan of `~/.claude/projects/**/*.jsonl` — jsonl mtime → live / idle / today |
+| network       | local interfaces (psutil) + ipinfo.io for WAN/ISP/region                  |
+| weather       | zippopotam.us (zip → lat/lon, cached) + Open-Meteo current forecast       |
 
 Planned but not yet shipped: gmail.

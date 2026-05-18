@@ -68,6 +68,7 @@ STATE: dict[str, Any] = {
         "services": {"status": "pending"},
         "system": {"status": "pending"},
         "network": {"status": "pending"},
+        "weather": {"status": "pending"},
         "linear": {},   # populated per-workspace at startup; sentinel set if unconfigured
     },
     "ticker": [],  # list of {ts, source, text, level}
@@ -1532,6 +1533,134 @@ async def network_poll(token: str | None = None, interval: int = 300) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Weather provider (real — zippopotam.us geocode + open-meteo forecast)
+# --------------------------------------------------------------------------- #
+# Two keyless APIs in series: (1) resolve postal code → lat/lon via
+# zippopotam.us once at startup and cache it (zip → coords never changes),
+# (2) poll Open-Meteo's /forecast endpoint for current temp + WMO weather
+# code. Weather moves slowly so the default cadence is 15 minutes.
+
+_ZIPPOPOTAM_URL = "https://api.zippopotam.us"
+_OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
+
+# WMO weather code → short uppercase label. Covers what Open-Meteo emits
+# from `current.weather_code`. Unknown codes fall back to a numeric label
+# so the chip stays non-empty.
+_WMO_LABELS = {
+    0:  "CLEAR",
+    1:  "MOSTLY CLEAR",
+    2:  "PARTLY CLOUDY",
+    3:  "OVERCAST",
+    45: "FOG",
+    48: "FOG",
+    51: "DRIZZLE",
+    53: "DRIZZLE",
+    55: "DRIZZLE",
+    56: "FRZ DRIZZLE",
+    57: "FRZ DRIZZLE",
+    61: "RAIN",
+    63: "RAIN",
+    65: "HEAVY RAIN",
+    66: "FRZ RAIN",
+    67: "FRZ RAIN",
+    71: "SNOW",
+    73: "SNOW",
+    75: "HEAVY SNOW",
+    77: "SNOW GRAINS",
+    80: "SHOWERS",
+    81: "SHOWERS",
+    82: "HEAVY SHOWERS",
+    85: "SNOW SHOWERS",
+    86: "SNOW SHOWERS",
+    95: "T-STORM",
+    96: "T-STORM W/ HAIL",
+    99: "T-STORM W/ HAIL",
+}
+
+
+async def _geocode_zip(client: httpx.AsyncClient, zip_code: str, country: str) -> dict:
+    """Resolve a postal code to lat/lon + place name via zippopotam.us.
+
+    Returns {latitude, longitude, city, state}. Raises on HTTP error or
+    when the API returns no places (unknown zip).
+    """
+    r = await client.get(f"{_ZIPPOPOTAM_URL}/{country.lower()}/{zip_code}")
+    r.raise_for_status()
+    data = r.json()
+    places = data.get("places") or []
+    if not places:
+        raise ValueError(f"no place found for {country}/{zip_code}")
+    place = places[0]
+    return {
+        "latitude": float(place["latitude"]),
+        "longitude": float(place["longitude"]),
+        "city": (place.get("place name") or "").strip(),
+        "state": (place.get("state abbreviation") or place.get("state") or "").strip(),
+    }
+
+
+async def weather_poll(zip_code: str, country: str = "US",
+                       units: str = "F", interval: int = 900,
+                       label: str | None = None) -> None:
+    """Poll current weather for a postal code via Open-Meteo.
+
+    Geocoding (zip → lat/lon) is cached after the first successful resolution
+    so subsequent polls only hit Open-Meteo. A transient geocoder failure
+    just retries next cycle — it doesn't permanently disable the panel.
+    """
+    temp_unit = "fahrenheit" if units.upper().startswith("F") else "celsius"
+    unit_label = "F" if temp_unit == "fahrenheit" else "C"
+    geo: dict | None = None
+    while True:
+        try:
+            async with httpx.AsyncClient(
+                timeout=15, headers={"User-Agent": "cowork-dash/0.1"}
+            ) as c:
+                if geo is None:
+                    geo = await _geocode_zip(c, zip_code, country)
+                params = {
+                    "latitude": geo["latitude"],
+                    "longitude": geo["longitude"],
+                    "current": "temperature_2m,weather_code",
+                    "temperature_unit": temp_unit,
+                    "timezone": "auto",
+                }
+                r = await c.get(_OPEN_METEO_URL, params=params)
+                r.raise_for_status()
+                data = r.json()
+            current = data.get("current") or {}
+            temp = current.get("temperature_2m")
+            code = int(current.get("weather_code") or 0)
+            place = (label or geo.get("city") or zip_code).strip()
+            STATE["providers"]["weather"] = {
+                "status": "ok",
+                "updated_at": _now_iso(),
+                "temp": round(float(temp), 1) if temp is not None else None,
+                "unit": unit_label,
+                "condition": _WMO_LABELS.get(code, f"WMO {code}"),
+                "wmo_code": code,
+                "location": place,
+                "state": geo.get("state") or "",
+                "zip": zip_code,
+            }
+        except httpx.HTTPStatusError as e:
+            STATE["providers"]["weather"] = {
+                "status": "error",
+                "updated_at": _now_iso(),
+                "error": f"HTTP {e.response.status_code}: {e.response.text[:120]}",
+                "zip": zip_code,
+            }
+        except Exception as e:
+            STATE["providers"]["weather"] = {
+                "status": "error",
+                "updated_at": _now_iso(),
+                "error": f"{type(e).__name__}: {e}",
+                "zip": zip_code,
+            }
+        await asyncio.sleep(interval)
+
+
+# --------------------------------------------------------------------------- #
 # Lifespan + app
 # --------------------------------------------------------------------------- #
 
@@ -1631,6 +1760,22 @@ async def lifespan(_app: FastAPI):
         network_poll(netc.get("ipinfo_token"), netc.get("poll_seconds", 300))
     ))
     _push_ticker("daemon", "network provider online", "info")
+
+    wx = cfg.get("weather") or {}
+    if wx.get("zip"):
+        BACKGROUND_TASKS.append(asyncio.create_task(weather_poll(
+            zip_code=str(wx["zip"]),
+            country=str(wx.get("country", "US")),
+            units=str(wx.get("units", "F")),
+            interval=max(60, int(wx.get("poll_seconds", 900))),
+            label=wx.get("label"),
+        )))
+        _push_ticker("daemon", f"weather provider online ({wx['zip']})", "info")
+    else:
+        STATE["providers"]["weather"] = {
+            "status": "unconfigured",
+            "message": "Add [weather] zip to ~/.cowork-dash/config.toml",
+        }
 
     _push_ticker("daemon", "cowork-dash online", "info")
 

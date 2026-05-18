@@ -659,6 +659,25 @@ let lastTickerLen = -1;
 // Network panel — WAN ip / ISP / region / VPN
 //------------------------------------------------------------------
 
+function renderWeather(p) {
+  const w = el('weather');
+  if (!w) return;
+  if (!p || p.status === 'pending' || p.status === 'unconfigured' || p.status === 'error'
+      || typeof p.temp !== 'number') {
+    w.textContent = '—';
+    w.title = (p && p.error) || (p && p.message) || '';
+    return;
+  }
+  const t = Math.round(p.temp);
+  const unit = p.unit || 'F';
+  const loc = (p.location || '').toUpperCase();
+  w.textContent = loc ? `${t}°${unit} · ${loc}` : `${t}°${unit}`;
+  // Hover reveals the full WMO condition (CLEAR, T-STORM, etc).
+  w.title = p.condition
+    ? (loc ? `${p.condition} · ${loc}` : p.condition)
+    : loc;
+}
+
 function renderNetwork(p) {
   setMeta('network-meta', p);
   if (!p || p.status === 'pending') { setHtml('network-body', '<div class="dim">loading…</div>'); return; }
@@ -810,6 +829,7 @@ async function poll() {
     const p = s.providers || {};
     renderServices(p.services);
     renderNetwork(p.network);
+    renderWeather(p.weather);
     renderClaude(p.claude);
     renderSessions(p.claude);
     renderCalendar(p.calendar);
