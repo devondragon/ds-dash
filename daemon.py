@@ -1116,7 +1116,10 @@ async def linear_poll(label: str, api_key: str, interval: int, state_types: list
 CLAUDE_PROJECTS_ROOT = Path.home() / ".claude" / "projects"
 _CLAUDE_USAGE_URL = "https://api.anthropic.com/v1/messages"
 # Cheapest valid probe: 1 Haiku token. Costs a fraction of a cent per poll.
-_CLAUDE_PROBE_MODEL = "claude-haiku-4-5-20251001"
+# Pinned snapshot for stability; override via [claude].probe_model in config
+# if/when this snapshot is retired by Anthropic (a 404 with model-not-found
+# response will surface as the panel's error chip).
+_CLAUDE_PROBE_MODEL_DEFAULT = "claude-haiku-4-5-20251001"
 _CLAUDE_KEYCHAIN_SERVICE = "Claude Code-credentials"
 
 
@@ -1163,7 +1166,7 @@ def _read_claude_oauth() -> dict | None:
     return {"access_token": tok, "expires_at_ms": oa.get("expiresAt")}
 
 
-async def _fetch_claude_usage_headers(access_token: str) -> dict:
+async def _fetch_claude_usage_headers(access_token: str, probe_model: str) -> dict:
     """POST a 1-token Messages request and parse usage from rate-limit headers.
 
     Returns {five_pct, five_resets_at, weekly_pct, weekly_resets_at} where
@@ -1176,7 +1179,7 @@ async def _fetch_claude_usage_headers(access_token: str) -> dict:
         "Content-Type": "application/json",
     }
     body = {
-        "model": _CLAUDE_PROBE_MODEL,
+        "model": probe_model,
         "max_tokens": 1,
         "messages": [{"role": "user", "content": "hi"}],
     }
@@ -1256,7 +1259,7 @@ def _cc_sessions_payload(sessions: dict) -> dict:
     }
 
 
-async def claude_poll(interval: int = 300) -> None:
+async def claude_poll(interval: int = 300, probe_model: str = _CLAUDE_PROBE_MODEL_DEFAULT) -> None:
     """Real provider — powers both CLAUDE USAGE and CC SESSIONS panels.
 
     Usage data comes from Anthropic's rate-limit response headers, polled
@@ -1283,7 +1286,7 @@ async def claude_poll(interval: int = 300) -> None:
                     "cc_sessions": _cc_sessions_payload(sessions),
                 }
             else:
-                usage = await _fetch_claude_usage_headers(creds["access_token"])
+                usage = await _fetch_claude_usage_headers(creds["access_token"], probe_model)
                 STATE["providers"]["claude"] = {
                     "status": "ok",
                     "updated_at": _now_iso(),
@@ -1749,6 +1752,7 @@ async def lifespan(_app: FastAPI):
     cl = cfg.get("claude") or {}
     BACKGROUND_TASKS.append(asyncio.create_task(claude_poll(
         interval=cl.get("poll_seconds", 300),
+        probe_model=cl.get("probe_model", _CLAUDE_PROBE_MODEL_DEFAULT),
     )))
     _push_ticker("daemon", "claude provider online", "info")
     sysc = cfg.get("system") or {}
