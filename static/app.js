@@ -388,14 +388,26 @@ function ghIssueList(items, emptyMsg) {
   }).join('');
 }
 
+const GH_KIND_LABEL = {
+  push: 'PSH', pr: 'PR', review: 'REV', issue: 'ISS', comment: 'CMT',
+  create: 'NEW', delete: 'DEL', fork: 'FRK', star: 'STR',
+  release: 'REL', public: 'PUB', discussion: 'DSC',
+};
+
 function ghActivityList(items) {
   if (!items || !items.length) return '<div class="dim" style="margin-top:var(--space-3)">no recent activity</div>';
-  return items.map(ev => `
-    <div class="pr-item">
-      <span class="pr-title"><span class="dim" style="font-size:var(--fs-xs)">[${escapeHtml(ev.kind || '?')}]</span> ${escapeHtml(ev.detail || '')}</span>
-      <span class="pr-repo">${escapeHtml(ev.repo || '')} · ${timeAgo(ev.at)}</span>
-    </div>
-  `).join('');
+  return items.map(ev => {
+    const kind = ev.kind || '?';
+    const cls = ev.cls || kind;
+    const label = GH_KIND_LABEL[kind] || kind.toUpperCase().slice(0, 3);
+    const urlAttr = ev.url ? ` data-url="${escapeHtml(ev.url)}"` : '';
+    return `
+    <div class="activity-item"${urlAttr}>
+      <span class="activity-kind activity-${escapeHtml(cls)}">${escapeHtml(label)}</span>
+      <span class="activity-detail">${escapeHtml(ev.detail || '')}</span>
+      <span class="activity-meta">${escapeHtml(ev.repo || '')} · ${timeAgo(ev.at)}</span>
+    </div>`;
+  }).join('');
 }
 
 function renderGithubView(p) {

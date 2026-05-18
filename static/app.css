@@ -728,6 +728,59 @@ textarea.scratch::placeholder { color: var(--primary-deep); }
 }
 .pr-item .pr-repo { color: var(--primary-deep); font-size: var(--fs-xs); }
 
+/* GitHub activity feed — kind badge + detail + repo/time */
+.activity-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: var(--space-1) 0;
+  font-size: var(--fs-sm);
+  overflow: hidden;
+}
+.activity-item[data-url] { cursor: pointer; }
+.activity-item[data-url]:hover .activity-detail { color: var(--primary); }
+.activity-kind {
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.05em;
+  color: var(--primary-deep);
+  min-width: 28px;
+  text-align: right;
+}
+.activity-detail {
+  color: var(--primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.activity-meta {
+  color: var(--primary-deep);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+/* Per-kind tinting on the badge. Detail color stays uniform so titles read
+   as one column; the badge carries the categorical signal. */
+.activity-push     { color: var(--primary); }
+.activity-pr,
+.activity-pr-open  { color: var(--accent); }
+.activity-pr-merged { color: var(--warn); }
+.activity-pr-closed { color: var(--alert); }
+.activity-review,
+.activity-review-approved { color: var(--warn); }
+.activity-review-changes  { color: var(--alert); }
+.activity-issue,
+.activity-issue-open      { color: var(--accent); }
+.activity-issue-closed    { color: var(--alert); }
+.activity-comment  { color: var(--dim); }
+.activity-discussion { color: var(--accent); }
+.activity-create   { color: var(--primary); }
+.activity-delete   { color: var(--alert); }
+.activity-release  { color: var(--warn); }
+.activity-fork,
+.activity-star,
+.activity-default  { color: var(--dim); }
+
 /* Status footer */
 .panel-foot {
   color: var(--primary-deeper);

@@ -114,6 +114,135 @@ query($login: String!) {
 }
 """.strip()
 
+# Recent activity across PUBLIC + PRIVATE repos. The /users/{u}/events REST
+# endpoint only returns public-timeline events (stars, public pushes,
+# discussions); private-repo commits and PRs are invisible there even when
+# authenticated. contributionsCollection is what powers the profile graph
+# and is the only way to surface "what I actually did this week."
+GRAPHQL_RECENT_ACTIVITY = """
+query($login: String!, $from: DateTime!) {
+  user(login: $login) {
+    contributionsCollection(from: $from) {
+      pullRequestContributions(first: 15, orderBy: {direction: DESC}) {
+        nodes {
+          occurredAt
+          pullRequest {
+            number title url state isDraft merged
+            repository { nameWithOwner }
+          }
+        }
+      }
+      pullRequestReviewContributions(first: 15, orderBy: {direction: DESC}) {
+        nodes {
+          occurredAt
+          pullRequestReview { url state }
+          pullRequest {
+            number title url
+            repository { nameWithOwner }
+          }
+        }
+      }
+      issueContributions(first: 10, orderBy: {direction: DESC}) {
+        nodes {
+          occurredAt
+          issue {
+            number title url state
+            repository { nameWithOwner }
+          }
+        }
+      }
+      commitContributionsByRepository(maxRepositories: 25) {
+        repository { nameWithOwner url }
+        contributions(first: 10, orderBy: {direction: DESC, field: OCCURRED_AT}) {
+          nodes { commitCount occurredAt }
+        }
+      }
+    }
+  }
+}
+""".strip()
+
+
+def _from_contribution_collection(data: dict) -> list[dict]:
+    """Flatten a contributionsCollection payload into our event-row shape.
+
+    Each opened PR, submitted review, opened issue, and per-repo commit-day
+    bucket becomes one row keyed by occurredAt so the merged feed can be
+    sorted chronologically alongside the public-events feed.
+    """
+    out: list[dict] = []
+    cc = (((data.get("data") or {}).get("user") or {})
+          .get("contributionsCollection")) or {}
+
+    for n in (cc.get("pullRequestContributions") or {}).get("nodes") or []:
+        pr = n.get("pullRequest") or {}
+        repo = (pr.get("repository") or {}).get("nameWithOwner") or ""
+        if pr.get("merged"):
+            cls = "pr-merged"
+        elif (pr.get("state") or "").lower() == "closed":
+            cls = "pr-closed"
+        else:
+            cls = "pr-open"
+        draft = " [draft]" if pr.get("isDraft") else ""
+        out.append({
+            "kind": "pr",
+            "repo": repo,
+            "detail": f"opened PR #{pr.get('number')} {pr.get('title') or ''}{draft}".strip(),
+            "at": n.get("occurredAt") or "",
+            "url": pr.get("url") or "",
+            "cls": cls,
+        })
+
+    for n in (cc.get("pullRequestReviewContributions") or {}).get("nodes") or []:
+        pr = n.get("pullRequest") or {}
+        rev = n.get("pullRequestReview") or {}
+        repo = (pr.get("repository") or {}).get("nameWithOwner") or ""
+        state = (rev.get("state") or "").lower()
+        verb = {"approved": "approved", "changes_requested": "requested changes on",
+                "commented": "reviewed"}.get(state, "reviewed")
+        cls = "review-approved" if state == "approved" else (
+            "review-changes" if state == "changes_requested" else "review")
+        out.append({
+            "kind": "review",
+            "repo": repo,
+            "detail": f"{verb} PR #{pr.get('number')} {pr.get('title') or ''}".strip(),
+            "at": n.get("occurredAt") or "",
+            "url": rev.get("url") or pr.get("url") or "",
+            "cls": cls,
+        })
+
+    for n in (cc.get("issueContributions") or {}).get("nodes") or []:
+        iss = n.get("issue") or {}
+        repo = (iss.get("repository") or {}).get("nameWithOwner") or ""
+        cls = "issue-closed" if (iss.get("state") or "").lower() == "closed" else "issue-open"
+        out.append({
+            "kind": "issue",
+            "repo": repo,
+            "detail": f"opened #{iss.get('number')} {iss.get('title') or ''}".strip(),
+            "at": n.get("occurredAt") or "",
+            "url": iss.get("url") or "",
+            "cls": cls,
+        })
+
+    for r in cc.get("commitContributionsByRepository") or []:
+        repo_info = r.get("repository") or {}
+        repo = repo_info.get("nameWithOwner") or ""
+        repo_url = repo_info.get("url") or (f"https://github.com/{repo}" if repo else "")
+        for n in (r.get("contributions") or {}).get("nodes") or []:
+            c = n.get("commitCount") or 0
+            if c == 0:
+                continue
+            out.append({
+                "kind": "push",
+                "repo": repo,
+                "detail": f"{c} commit{'s' if c != 1 else ''}",
+                "at": n.get("occurredAt") or "",
+                "url": repo_url,
+                "cls": "push",
+            })
+
+    return out
+
 
 async def github_poll(token: str, username: str, interval: int) -> None:
     headers = {
@@ -197,16 +326,48 @@ async def github_poll(token: str, username: str, interval: int) -> None:
                     ],
                 }
 
-                # Recent public events (for ACTIVITY tab)
+                # Recent public events — stars, public pushes, discussions,
+                # forks. Misses private activity, which contributionsCollection
+                # picks up below.
                 current_call = "users/<login>/events"
                 r5 = await c.get(
                     f"{GITHUB_API}/users/{username}/events",
-                    params={"per_page": 12},
+                    params={"per_page": 30},
                 )
                 r5.raise_for_status()
-                result["recent_events"] = {
-                    "items": [_summarize_event(e) for e in r5.json()[:10] if _summarize_event(e)],
-                }
+                public_events = [_summarize_event(e) for e in r5.json() if _summarize_event(e)]
+
+                # Recent contributions across public+private repos (PRs opened,
+                # reviews submitted, issues opened, per-repo commit days).
+                current_call = "graphql (recent activity)"
+                since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+                r_act = await c.post(
+                    GITHUB_GRAPHQL,
+                    json={"query": GRAPHQL_RECENT_ACTIVITY,
+                          "variables": {"login": username, "from": since}},
+                )
+                r_act.raise_for_status()
+                act_payload = r_act.json()
+                if act_payload.get("errors"):
+                    raise RuntimeError(
+                        f"graphql errors: {act_payload['errors'][0].get('message', '?')}"
+                    )
+                contrib_events = _from_contribution_collection(act_payload)
+
+                merged = sorted(
+                    contrib_events + public_events,
+                    key=lambda e: e.get("at", ""),
+                    reverse=True,
+                )
+                seen: set[tuple[str, str]] = set()
+                deduped: list[dict] = []
+                for e in merged:
+                    key = (e.get("kind") or "", e.get("url") or e.get("detail") or "")
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    deduped.append(e)
+                result["recent_events"] = {"items": deduped[:15]}
 
                 # Contribution heatmap via GraphQL
                 current_call = "graphql (contribution heatmap)"
@@ -264,47 +425,144 @@ def _repo_short(repo_url: str) -> str:
 
 
 def _summarize_event(e: dict) -> dict | None:
-    """Reduce a /users/{u}/events payload entry to {kind, repo, detail, at}."""
+    """Reduce a /users/{u}/events payload entry to a display-ready row.
+
+    Returns {kind, repo, detail, at, url, cls} or None to filter out. Pushes
+    with no distinct commits (force-push noise, branch deletes that surface
+    twice) are dropped so the activity feed stays scannable.
+    """
     t = e.get("type") or ""
     repo = (e.get("repo") or {}).get("name") or ""
     payload = e.get("payload") or {}
     at = e.get("created_at") or ""
-    kind = t.replace("Event", "").lower() if t.endswith("Event") else t.lower()
-    detail = ""
+    repo_url = f"https://github.com/{repo}" if repo else ""
+
+    def out(kind: str, detail: str, url: str = "", cls: str = "") -> dict:
+        return {
+            "kind": kind,
+            "repo": repo,
+            "detail": detail.strip(),
+            "at": at,
+            "url": url or repo_url,
+            "cls": cls or kind,
+        }
+
     if t == "PushEvent":
-        n = payload.get("size") or len(payload.get("commits") or [])
+        commits = payload.get("commits") or []
+        distinct = sum(1 for c in commits if c.get("distinct", True))
+        n = distinct or payload.get("distinct_size") or 0
+        if n == 0:
+            return None
         branch = (payload.get("ref") or "").rsplit("/", 1)[-1]
-        detail = f"{n} commit{'s' if n != 1 else ''} → {branch}" if branch else f"{n} commits"
-    elif t == "PullRequestEvent":
+        msg = ""
+        for c in reversed(commits):
+            if c.get("distinct", True) and c.get("message"):
+                msg = c["message"].split("\n", 1)[0].strip()
+                break
+        head_label = msg or f"{n} commit{'s' if n != 1 else ''}"
+        more = f" +{n - 1}" if (msg and n > 1) else ""
+        detail = head_label + (f" → {branch}" if branch else "") + more
+        head = payload.get("head") or ""
+        before = payload.get("before") or ""
+        if repo and head and before:
+            url = f"{repo_url}/compare/{before}...{head}"
+        elif repo and branch:
+            url = f"{repo_url}/commits/{branch}"
+        else:
+            url = repo_url
+        return out("push", detail, url)
+
+    if t == "PullRequestEvent":
         pr = payload.get("pull_request") or {}
-        detail = f"{payload.get('action', '?')} PR #{pr.get('number', '?')} {pr.get('title') or ''}"
-    elif t == "PullRequestReviewEvent":
+        action = payload.get("action") or "?"
+        if action == "closed" and pr.get("merged"):
+            action = "merged"
+        cls = {"opened": "pr-open", "merged": "pr-merged", "closed": "pr-closed",
+               "reopened": "pr-open"}.get(action, "pr")
+        detail = f"{action} PR #{pr.get('number', '?')} {pr.get('title') or ''}"
+        return out("pr", detail, pr.get("html_url") or "", cls)
+
+    if t == "PullRequestReviewEvent":
         pr = payload.get("pull_request") or {}
-        detail = f"reviewed PR #{pr.get('number', '?')} {pr.get('title') or ''}"
-    elif t == "IssuesEvent":
+        review = payload.get("review") or {}
+        state = (review.get("state") or "").lower()
+        verb = {"approved": "approved", "changes_requested": "requested changes on",
+                "commented": "reviewed"}.get(state, "reviewed")
+        cls = "review-approved" if state == "approved" else (
+            "review-changes" if state == "changes_requested" else "review")
+        detail = f"{verb} PR #{pr.get('number', '?')} {pr.get('title') or ''}"
+        return out("review", detail, review.get("html_url") or pr.get("html_url") or "", cls)
+
+    if t == "IssuesEvent":
         iss = payload.get("issue") or {}
-        detail = f"{payload.get('action', '?')} #{iss.get('number', '?')} {iss.get('title') or ''}"
-    elif t == "IssueCommentEvent":
+        action = payload.get("action") or "?"
+        cls = "issue-open" if action == "opened" else (
+            "issue-closed" if action == "closed" else "issue")
+        detail = f"{action} #{iss.get('number', '?')} {iss.get('title') or ''}"
+        return out("issue", detail, iss.get("html_url") or "", cls)
+
+    if t == "IssueCommentEvent":
         iss = payload.get("issue") or {}
-        detail = f"comment on #{iss.get('number', '?')} {iss.get('title') or ''}"
-    elif t == "CreateEvent":
-        detail = f"created {payload.get('ref_type', '')} {payload.get('ref') or ''}".strip()
-    elif t == "DeleteEvent":
-        detail = f"deleted {payload.get('ref_type', '')} {payload.get('ref') or ''}".strip()
-    elif t == "ForkEvent":
-        detail = "forked"
-    elif t == "WatchEvent":
-        detail = "starred"
-    elif t == "ReleaseEvent":
+        cmt = payload.get("comment") or {}
+        body = (cmt.get("body") or "").split("\n", 1)[0].strip()
+        if len(body) > 80:
+            body = body[:77] + "…"
+        snippet = f": {body}" if body else ""
+        detail = f"commented on #{iss.get('number', '?')} {iss.get('title') or ''}{snippet}"
+        return out("comment", detail, cmt.get("html_url") or iss.get("html_url") or "")
+
+    if t == "CreateEvent":
+        rtype = payload.get("ref_type") or ""
+        ref = payload.get("ref") or ""
+        detail = f"created {rtype} {ref}".strip()
+        if rtype == "branch" and ref:
+            url = f"{repo_url}/tree/{ref}"
+        elif rtype == "tag" and ref:
+            url = f"{repo_url}/releases/tag/{ref}"
+        else:
+            url = repo_url
+        return out("create", detail, url)
+
+    if t == "DeleteEvent":
+        rtype = payload.get("ref_type") or ""
+        ref = payload.get("ref") or ""
+        return out("delete", f"deleted {rtype} {ref}".strip())
+
+    if t == "ForkEvent":
+        forkee = (payload.get("forkee") or {}).get("html_url") or ""
+        return out("fork", "forked", forkee)
+
+    if t == "WatchEvent":
+        return out("star", "starred")
+
+    if t == "ReleaseEvent":
         rel = payload.get("release") or {}
-        detail = f"{payload.get('action', '?')} release {rel.get('tag_name') or ''}"
-    elif t == "PublicEvent":
-        detail = "made public"
-    elif t:
-        detail = t
-    else:
-        return None
-    return {"kind": kind, "repo": repo, "detail": detail.strip(), "at": at}
+        action = payload.get("action") or "?"
+        detail = f"{action} release {rel.get('tag_name') or ''}".strip()
+        return out("release", detail, rel.get("html_url") or "")
+
+    if t == "PublicEvent":
+        return out("public", "made public", cls="create")
+
+    if t == "DiscussionEvent":
+        disc = payload.get("discussion") or {}
+        action = payload.get("action") or "?"
+        detail = f"{action} discussion #{disc.get('number', '?')} {disc.get('title') or ''}"
+        return out("discussion", detail, disc.get("html_url") or "")
+
+    if t == "DiscussionCommentEvent":
+        disc = payload.get("discussion") or {}
+        cmt = payload.get("comment") or {}
+        body = (cmt.get("body") or "").split("\n", 1)[0].strip()
+        if len(body) > 80:
+            body = body[:77] + "…"
+        snippet = f": {body}" if body else ""
+        detail = f"commented on discussion #{disc.get('number', '?')} {disc.get('title') or ''}{snippet}"
+        return out("comment", detail, cmt.get("html_url") or disc.get("html_url") or "")
+
+    if t:
+        return out(t.replace("Event", "").lower(), t, cls="default")
+    return None
 
 
 # --------------------------------------------------------------------------- #
