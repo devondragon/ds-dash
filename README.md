@@ -12,6 +12,20 @@ panel is unavailable and Claude usage needs
 Linear, services, system, network, weather, scratchpad) is
 cross-platform.
 
+## Screenshots
+
+NIGHTOPS theme (default, dark):
+
+![NIGHTOPS dashboard](docs/screenshots/dashboard-nightops.png)
+
+TRON·LIGHT theme (one of five — cycle via the `THEME` chip or press `T`):
+
+![TRON·LIGHT dashboard](docs/screenshots/dashboard-tron-light.png)
+
+Shots are taken against a mock-data demo server — no real credentials,
+no polling. You can run the same demo locally with
+`python scripts/demo.py` (then open <http://localhost:7777>).
+
 ## Install + run
 
 ```bash
