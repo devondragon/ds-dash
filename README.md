@@ -1,4 +1,4 @@
-# cowork-dash
+# ds-dash
 
 A local personal dashboard. Cyberpunk-themed single-pane-of-glass for
 GitHub, calendar, tasks, Linear, Claude Code usage, service status,
@@ -19,7 +19,7 @@ cross-platform.
 ```
 
 First run creates `.venv/`, installs deps, and copies a starter config
-to `~/.cowork-dash/config.toml`. The dashboard runs at
+to `~/.ds-dash/config.toml`. The dashboard runs at
 <http://localhost:7766> with the panels you've configured live and the
 rest showing `OFFLINE` — you can run it with zero credentials and it
 still surfaces services, system stats, network, and weather (after you
@@ -35,7 +35,7 @@ full list of provider blocks.
 The daemon binds to `127.0.0.1` (loopback only) by default, so the
 dashboard is reachable only from the host machine. To open it on another
 device on your network — e.g. an iPad in the same room — set
-`[server].host` in `~/.cowork-dash/config.toml`:
+`[server].host` in `~/.ds-dash/config.toml`:
 
 ```toml
 [server]
@@ -61,7 +61,7 @@ just shows `OFFLINE` and the rest of the dashboard works normally.
   installed; no config needed unless `ical-buddy` lives somewhere other
   than `/opt/homebrew/bin`.
 - **Tasks** (Motion) — set `[motion].api_key` in
-  `~/.cowork-dash/config.toml` (Motion → Settings → API & Integrations).
+  `~/.ds-dash/config.toml` (Motion → Settings → API & Integrations).
 - **Linear** — add one `[[linear]]` block per workspace, each with a
   `label` and personal `api_key` (Linear → Settings → API).
 - **Claude usage** — sign in to Claude Code (`claude` CLI). The daemon
@@ -102,7 +102,7 @@ Nothing is written back.
 ## Customizing
 
 - **Operator label** — set `[ui].operator_name` in
-  `~/.cowork-dash/config.toml` to change the `OPERATOR://NAME` header
+  `~/.ds-dash/config.toml` to change the `OPERATOR://NAME` header
   text. Falls back to `$USER` if unset.
 - **Themes** — click the THEME chip in the header (or press `T`) to
   cycle: NIGHTOPS · TRON·DARK · TRON·LIGHT · CYBER·DARK · CYBER·LIGHT.

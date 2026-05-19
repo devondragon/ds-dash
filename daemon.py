@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-cowork-dash: local dashboard daemon.
+ds-dash: local dashboard daemon.
 
 One FastAPI app, one in-memory STATE dict, one background asyncio task
 per configured provider. Each provider writes to STATE["providers"][name]
@@ -46,8 +46,8 @@ from fastapi.staticfiles import StaticFiles
 # Config + shared state
 # --------------------------------------------------------------------------- #
 
-CONFIG_PATH = Path(os.environ.get("COWORK_DASH_CONFIG", str(Path.home() / ".cowork-dash" / "config.toml")))
-SCRATCHPAD_PATH = Path(os.environ.get("COWORK_DASH_SCRATCHPAD", str(Path.home() / ".cowork-dash" / "scratchpad.txt")))
+CONFIG_PATH = Path(os.environ.get("DS_DASH_CONFIG", str(Path.home() / ".ds-dash" / "config.toml")))
+SCRATCHPAD_PATH = Path(os.environ.get("DS_DASH_SCRATCHPAD", str(Path.home() / ".ds-dash" / "scratchpad.txt")))
 STATIC_DIR = Path(__file__).parent / "static"
 
 # Everything the frontend renders lives in here. Each provider owns one
@@ -77,7 +77,7 @@ STATE: dict[str, Any] = {
 
 def load_config() -> dict:
     if not CONFIG_PATH.exists():
-        print(f"[cowork-dash] no config at {CONFIG_PATH} — running with empty config", file=sys.stderr)
+        print(f"[ds-dash] no config at {CONFIG_PATH} — running with empty config", file=sys.stderr)
         return {}
     with CONFIG_PATH.open("rb") as f:
         return tomllib.load(f)
@@ -254,7 +254,7 @@ async def github_poll(token: str, username: str, interval: int) -> None:
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "cowork-dash/0.1",
+        "User-Agent": "ds-dash/0.1",
     }
     prev_total = None
     while True:
@@ -820,7 +820,7 @@ async def motion_poll(api_key: str, interval: int = 60) -> None:
     not in a resolved status), sorts by priority + due, sends top N to
     the panel while reporting the full active count in open_count.
     """
-    headers = {"X-API-Key": api_key, "Accept": "application/json", "User-Agent": "cowork-dash/0.1"}
+    headers = {"X-API-Key": api_key, "Accept": "application/json", "User-Agent": "ds-dash/0.1"}
     while True:
         try:
             async with httpx.AsyncClient(timeout=20, headers=headers) as c:
@@ -1004,7 +1004,7 @@ async def linear_poll(label: str, api_key: str, interval: int, state_types: list
     headers = {
         "Authorization": api_key,            # personal keys: NO "Bearer " prefix
         "Content-Type": "application/json",
-        "User-Agent": "cowork-dash/0.1",
+        "User-Agent": "ds-dash/0.1",
     }
     variables = {"stateTypes": state_types}
     prev_ids: set[str] = set()
@@ -1417,7 +1417,7 @@ async def services_poll(interval: int = 300) -> None:
     }
     while True:
         results = {}
-        async with httpx.AsyncClient(timeout=15, headers={"User-Agent": "cowork-dash/0.1"}) as c:
+        async with httpx.AsyncClient(timeout=15, headers={"User-Agent": "ds-dash/0.1"}) as c:
             for name, url in endpoints.items():
                 try:
                     r = await c.get(url)
@@ -1477,7 +1477,7 @@ async def network_poll(token: str | None = None, interval: int = 300) -> None:
     and adds optional fields.
     """
     url = "https://ipinfo.io/json"
-    headers = {"User-Agent": "cowork-dash/0.1", "Accept": "application/json"}
+    headers = {"User-Agent": "ds-dash/0.1", "Accept": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     prev_wan: str | None = None
@@ -1617,7 +1617,7 @@ async def weather_poll(zip_code: str, country: str = "US",
     while True:
         try:
             async with httpx.AsyncClient(
-                timeout=15, headers={"User-Agent": "cowork-dash/0.1"}
+                timeout=15, headers={"User-Agent": "ds-dash/0.1"}
             ) as c:
                 if geo is None:
                     geo = await _geocode_zip(c, zip_code, country)
@@ -1687,7 +1687,7 @@ async def lifespan(_app: FastAPI):
     else:
         STATE["providers"]["github"] = {
             "status": "unconfigured",
-            "message": "Add [github] token and username to ~/.cowork-dash/config.toml",
+            "message": "Add [github] token and username to ~/.ds-dash/config.toml",
         }
 
     cal = cfg.get("calendar") or {}
@@ -1714,26 +1714,26 @@ async def lifespan(_app: FastAPI):
     else:
         STATE["providers"]["tasks"] = {
             "status": "unconfigured",
-            "message": "Add [motion] api_key to ~/.cowork-dash/config.toml",
+            "message": "Add [motion] api_key to ~/.ds-dash/config.toml",
         }
 
     lin_blocks = cfg.get("linear") or []
     if not isinstance(lin_blocks, list):
-        print("[cowork-dash] [linear] in config.toml must be an array of tables ([[linear]])", file=sys.stderr)
+        print("[ds-dash] [linear] in config.toml must be an array of tables ([[linear]])", file=sys.stderr)
         lin_blocks = []
     seen_labels: set[str] = set()
     started_any = False
     for idx, block in enumerate(lin_blocks):
         if not isinstance(block, dict):
-            print(f"[cowork-dash] [[linear]] entry #{idx} is not a table — skipping", file=sys.stderr)
+            print(f"[ds-dash] [[linear]] entry #{idx} is not a table — skipping", file=sys.stderr)
             continue
         label = block.get("label")
         api_key = block.get("api_key")
         if not label or not api_key:
-            print(f"[cowork-dash] [[linear]] entry #{idx} missing label or api_key — skipping", file=sys.stderr)
+            print(f"[ds-dash] [[linear]] entry #{idx} missing label or api_key — skipping", file=sys.stderr)
             continue
         if label in seen_labels:
-            print(f"[cowork-dash] [[linear]] duplicate label '{label}' — keeping the first, skipping later", file=sys.stderr)
+            print(f"[ds-dash] [[linear]] duplicate label '{label}' — keeping the first, skipping later", file=sys.stderr)
             continue
         seen_labels.add(label)
         STATE["providers"]["linear"][label] = {"status": "pending"}
@@ -1746,7 +1746,7 @@ async def lifespan(_app: FastAPI):
     if not started_any:
         STATE["providers"]["linear"] = {
             "status": "unconfigured",
-            "message": "Add [[linear]] blocks to ~/.cowork-dash/config.toml",
+            "message": "Add [[linear]] blocks to ~/.ds-dash/config.toml",
         }
 
     cl = cfg.get("claude") or {}
@@ -1778,10 +1778,10 @@ async def lifespan(_app: FastAPI):
     else:
         STATE["providers"]["weather"] = {
             "status": "unconfigured",
-            "message": "Add [weather] zip to ~/.cowork-dash/config.toml",
+            "message": "Add [weather] zip to ~/.ds-dash/config.toml",
         }
 
-    _push_ticker("daemon", "cowork-dash online", "info")
+    _push_ticker("daemon", "ds-dash online", "info")
 
     try:
         yield
@@ -1793,7 +1793,7 @@ async def lifespan(_app: FastAPI):
                 await t
 
 
-app = FastAPI(title="cowork-dash", lifespan=lifespan)
+app = FastAPI(title="ds-dash", lifespan=lifespan)
 
 
 @app.get("/api/state.json")
@@ -1854,12 +1854,12 @@ def main() -> None:
     host = server_cfg.get("host", "127.0.0.1")
     if host not in ("127.0.0.1", "localhost"):
         print(
-            f"[cowork-dash] WARNING: binding to {host} exposes this dashboard "
+            f"[ds-dash] WARNING: binding to {host} exposes this dashboard "
             "(GitHub data, calendar, scratchpad — no auth) to anyone who can "
             "reach this host on the network. Use only on a trusted LAN.",
             file=sys.stderr,
         )
-    print(f"[cowork-dash] listening on http://{host}:{port}")
+    print(f"[ds-dash] listening on http://{host}:{port}")
     uvicorn.run(app, host=host, port=port, log_level="info")
 
 

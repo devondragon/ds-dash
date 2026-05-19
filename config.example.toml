@@ -1,5 +1,5 @@
-# cowork-dash configuration
-# Copy this file to ~/.cowork-dash/config.toml and fill in your values.
+# ds-dash configuration
+# Copy this file to ~/.ds-dash/config.toml and fill in your values.
 
 [server]
 # Port the daemon listens on. Open http://localhost:PORT in any browser tab.
@@ -73,8 +73,8 @@ poll_seconds = 300
 
 # [gmail]
 # # OAuth credentials path (Google Cloud project)
-# credentials = "~/.cowork-dash/gmail-credentials.json"
-# token = "~/.cowork-dash/gmail-token.json"
+# credentials = "~/.ds-dash/gmail-credentials.json"
+# token = "~/.ds-dash/gmail-token.json"
 
 [system]
 poll_seconds = 5

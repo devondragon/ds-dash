@@ -2,7 +2,7 @@
 
 ## Threat model
 
-cowork-dash is a **local-only** dashboard. Its security model is bind
+ds-dash is a **local-only** dashboard. Its security model is bind
 address + filesystem perms — there is no authentication on any endpoint,
 including the writable scratchpad. By default the daemon binds to
 `127.0.0.1` so only the local machine can reach it.
@@ -20,7 +20,7 @@ This is fine on a trusted LAN; do not expose it to the public internet.
 
 ## Credentials
 
-All provider credentials live in `~/.cowork-dash/config.toml`. The file
+All provider credentials live in `~/.ds-dash/config.toml`. The file
 is outside the repo and not git-tracked. Recommendation: `chmod 600`. The
 daemon never reads credentials from environment variables and never logs
 tokens.

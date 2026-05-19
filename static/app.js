@@ -744,7 +744,7 @@ document.addEventListener('click', e => {
 let lastSystem = null;
 
 //------------------------------------------------------------------
-// Scratchpad — debounced autosave to ~/.cowork-dash/scratchpad.txt
+// Scratchpad — debounced autosave to ~/.ds-dash/scratchpad.txt
 //------------------------------------------------------------------
 
 let scratchSaveTimer = null;

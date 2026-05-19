@@ -1,4 +1,4 @@
-# cowork-dash
+# ds-dash
 
 A local-only personal dashboard. A Python daemon polls a handful of providers
 on a schedule and writes their state into a single in-memory blob; a single
@@ -37,14 +37,14 @@ daemon.py            FastAPI app, STATE blob, all provider pollers
 static/index.html    Frontend markup (references /app.css and /app.js)
 static/app.css       All styles, themes, responsive blocks
 static/app.js        All client JS — render functions, polling, theme cycler
-config.example.toml  Starter config; copied to ~/.cowork-dash/config.toml on first run
+config.example.toml  Starter config; copied to ~/.ds-dash/config.toml on first run
 run.sh               Bootstraps .venv, copies starter config, runs the daemon
 requirements.txt     fastapi, uvicorn, httpx, psutil, tomli (3.10 fallback)
 docs/FRONTEND.md     Layout, rendering, NIGHTOPS palette + tokens (load on demand)
 ```
 
-Config lives **outside** the repo at `~/.cowork-dash/config.toml` so secrets
-never get committed. Override with `COWORK_DASH_CONFIG=/path/to/file`.
+Config lives **outside** the repo at `~/.ds-dash/config.toml` so secrets
+never get committed. Override with `DS_DASH_CONFIG=/path/to/file`.
 
 ## Provider polling pattern
 
@@ -97,7 +97,7 @@ if mp.get("api_key"):
 else:
     STATE["providers"]["myprovider"] = {
         "status": "unconfigured",
-        "message": "Add [myprovider] api_key to ~/.cowork-dash/config.toml",
+        "message": "Add [myprovider] api_key to ~/.ds-dash/config.toml",
     }
 ```
 
@@ -174,7 +174,7 @@ color in the frontend.
 
 Read from `config.toml` only. Never read environment variables for
 provider credentials, never log a token. Config sample lives in
-`config.example.toml`; the real file is at `~/.cowork-dash/config.toml`
+`config.example.toml`; the real file is at `~/.ds-dash/config.toml`
 (outside the repo, `chmod 600`).
 
 ### Time
