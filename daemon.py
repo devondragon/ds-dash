@@ -1839,8 +1839,19 @@ async def scratchpad_set(payload: dict = Body(...)):
 
 
 # Mount static last so /api/* takes priority.
+# Subclass StaticFiles to disable client caching. This is a local-only dev
+# dashboard; iOS Safari in particular caches HTML/CSS/JS aggressively even
+# without an explicit Cache-Control header, which made iPad reloads silently
+# show stale builds. no-store forces a fresh fetch every time.
+class NoCacheStaticFiles(StaticFiles):
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-store, must-revalidate"
+        return response
+
+
 if STATIC_DIR.exists():
-    app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
+    app.mount("/", NoCacheStaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 
 
 def main() -> None:

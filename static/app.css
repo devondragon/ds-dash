@@ -1161,6 +1161,15 @@ body.offline .offline-overlay { display: block; }
   /* Task-row cap is inherited from the ≤1400 tier above (5 per panel). */
 }
 
+/* iPad space-saver — drop CC sessions count, scratchpad, and the
+   GitHub overview's REVIEW REQUESTED list (counts above still tell
+   the same story) to free vertical room for Claude usage and Linear
+   panels. Gated on the `is-ipad` body class set by the inline detector
+   in index.html so this never fires for narrow desktop windows. */
+body.is-ipad #panel-sessions,
+body.is-ipad #panel-scratch { display: none; }
+body.is-ipad #github-body .gh-overview-extra { display: none; }
+
 /* Mobile (≤640px) — single col, hide MOCK-only panels.
    640 was 900: bumped down so iPad mini portrait (744) hits tablet, not mobile. */
 @media (max-width: 640px) {

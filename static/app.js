@@ -444,7 +444,7 @@ function renderGithubView(p) {
     <div class="row"><span class="dim">PRs mine open</span><span>${my.count}</span></div>
     <div class="row"><span class="dim">Issues assigned</span><span>${ia.count}</span></div>
     <div class="row"><span class="dim">Commits today</span><span class="ok">${today}</span></div>
-    ${prList}
+    <div class="gh-overview-extra">${prList}</div>
   `;
 }
 

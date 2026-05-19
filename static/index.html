@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/app.css?v=3">
 </head>
 <body>
 <script>
@@ -24,6 +24,19 @@
         document.body.classList.add('theme-tron-light');
       }
     } catch (e) { /* localStorage or matchMedia blocked — fall through to default */ }
+  })();
+  // Tag iPad pre-paint so the iPad-only space-saver CSS can hide panels
+  // without firing for desktop browsers at narrow widths. Detects both
+  // standard mode (UA contains "iPad") and "Request Desktop Website" mode
+  // (UA matches Mac Safari, but iPad still reports maxTouchPoints > 1
+  // while a real Mac reports 0).
+  (function () {
+    try {
+      var ua = navigator.userAgent || '';
+      var isIPad = /iPad/.test(ua) ||
+                   (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
+      if (isIPad) document.body.classList.add('is-ipad');
+    } catch (e) { /* navigator missing — fall through, no iPad tag */ }
   })();
 </script>
 <div class="offline-overlay"></div>
@@ -232,6 +245,6 @@
   </div>
 </div>
 
-<script src="/app.js"></script>
+<script src="/app.js?v=2"></script>
 </body>
 </html>
