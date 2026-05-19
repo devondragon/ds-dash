@@ -135,6 +135,14 @@ should follow the polling pattern documented in
 specifics. Security-sensitive reports: see
 [`SECURITY.md`](SECURITY.md).
 
+[`CLAUDE.md`](CLAUDE.md) and [`docs/FRONTEND.md`](docs/FRONTEND.md)
+are written to double as instruction manuals for AI agents — adding a
+new provider or theme via Claude Code (or Codex, Cursor, etc.) is
+usually one prompt away from a working implementation. The provider
+polling pattern, `STATE` shape, status vocabulary, ticker conventions,
+and design tokens are all spelled out. Most of the existing providers
+were built that way.
+
 ## Architecture
 
 See [`CLAUDE.md`](CLAUDE.md) for the provider polling pattern, status
