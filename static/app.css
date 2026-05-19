@@ -691,7 +691,7 @@ textarea.scratch::placeholder { color: var(--primary-deep); }
 }
 .ticker-track {
   display: inline-block;
-  animation: scroll 60s linear infinite;
+  animation: scroll 90s linear infinite;
   padding-left: 100%;
 }
 .ticker-track:hover { animation-play-state: paused; }
