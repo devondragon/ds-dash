@@ -634,7 +634,10 @@ function renderSystem(sys) {
 }
 
 function renderTicker(events) {
+  const track = document.getElementById('ticker-track');
+  if (!track) return;
   if (!events || !events.length) {
+    track.style.removeProperty('--ticker-duration');
     setHtml('ticker-track', '<span class="dim">awaiting events…</span>');
     return;
   }
@@ -647,6 +650,13 @@ function renderTicker(events) {
     </span>
   `).join('');
   setHtml('ticker-track', items + items);
+  // Pin scroll velocity to a comfortable reading rate. Without this the
+  // fixed CSS duration gives faster pixel/sec velocity as content grows.
+  const PX_PER_SEC = 60;
+  const width = track.offsetWidth;
+  if (width > 0) {
+    track.style.setProperty('--ticker-duration', `${Math.round(width / PX_PER_SEC)}s`);
+  }
 }
 
 //------------------------------------------------------------------
