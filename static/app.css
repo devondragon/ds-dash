@@ -399,6 +399,34 @@ body.theme-weyland {
   --header-amber: var(--gold);
 }
 
+/* Weyland-Yutani header badge — hidden everywhere except the four Alien
+   themes, which flip it to inline-flex below. Color tracks --header-amber so
+   it recolors per theme (amber/green/teal/gold). */
+.wy-badge { display: none; align-items: center; gap: var(--space-4); }
+body.theme-nostromo .wy-badge,
+body.theme-muthur   .wy-badge,
+body.theme-sulaco   .wy-badge,
+body.theme-weyland  .wy-badge { display: inline-flex; }
+
+.wy-mark { width: 30px; height: 16px; color: var(--header-amber); flex: none; }
+.wy-text { display: flex; flex-direction: column; }
+.wy-name {
+  font-family: var(--vt);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.14em;
+  line-height: 1.05;
+  color: var(--header-amber);
+}
+.wy-tag {
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.22em;
+  line-height: 1.05;
+  color: var(--primary-dim);
+}
+/* collapse the tagline at the ≤640px tier, where the header already sheds
+   #weather / .sys / .sys-spark-wrap. */
+@media (max-width: 640px) { .wy-tag { display: none; } }
+
 * { box-sizing: border-box; }
 
 html, body {
