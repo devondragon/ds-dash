@@ -261,6 +261,144 @@ body.theme-cyberpunk-light {
   --header-amber: var(--gold);
 }
 
+/* ALIEN — NOSTROMO (Isolation amber CRT): amber phosphor primary, W-Y blue
+   accent, hazard-red alarms, on warm near-black. Slight CRT bloom. */
+body.theme-nostromo {
+  --bg: #0a0600;
+  --panel: #17100a;
+  --rule: #3c2a12;
+  --dim: #b08a3a;
+  --cyan: #ffb000;
+  --amber: #59b0d6;
+  --gold: #ffcf52;
+  --magenta: #ff3b1f;
+  --primary-deep: #a06f1a;
+  --primary-deeper: #3a2a10;
+  --alarm: #ff3b1f;
+  --bg-rgb: 10 6 0;
+  --panel-rgb: 23 16 10;
+  --rule-rgb: 60 42 18;
+  --cyan-rgb: 255 176 0;
+  --amber-rgb: 89 176 214;
+  --gold-rgb: 255 207 82;
+  --magenta-rgb: 255 59 31;
+  --alarm-rgb: 255 59 31;
+  --ticker-bg-rgb: 28 16 4;
+  --trace-bg-rgb: 26 18 8;
+  --glow-strong: 0.55;
+  --bg-panel: rgb(var(--panel-rgb) / 0.55);
+  --border: var(--rule);
+  --primary: var(--cyan);
+  --primary-dim: var(--dim);
+  --accent: var(--amber);
+  --warn: var(--gold);
+  --alert: var(--magenta);
+  --header-amber: var(--gold);
+}
+
+/* ALIEN — MU-TH-UR (MOTHER green phosphor): monochrome green, mint accent,
+   amber as the lone warm warning, red alarms. Strong phosphor bloom. */
+body.theme-muthur {
+  --bg: #020600;
+  --panel: #06120a;
+  --rule: #114022;
+  --dim: #1f8a44;
+  --cyan: #33ff66;
+  --amber: #66ffaa;
+  --gold: #ffb000;
+  --magenta: #ff4030;
+  --primary-deep: #1f7a3a;
+  --primary-deeper: #0c2e18;
+  --alarm: #ff4030;
+  --bg-rgb: 2 6 0;
+  --panel-rgb: 6 18 10;
+  --rule-rgb: 17 64 34;
+  --cyan-rgb: 51 255 102;
+  --amber-rgb: 102 255 170;
+  --gold-rgb: 255 176 0;
+  --magenta-rgb: 255 64 48;
+  --alarm-rgb: 255 64 48;
+  --ticker-bg-rgb: 0 24 8;
+  --trace-bg-rgb: 4 26 12;
+  --glow-strong: 0.65;
+  --bg-panel: rgb(var(--panel-rgb) / 0.55);
+  --border: var(--rule);
+  --primary: var(--cyan);
+  --primary-dim: var(--dim);
+  --accent: var(--amber);
+  --warn: var(--gold);
+  --alert: var(--magenta);
+  --header-amber: var(--gold);
+}
+
+/* ALIEN — SULACO (USCM / Colonial Marines): tac-green primary, scanner-cyan
+   accent, caution-amber, pulse-rifle red, on cold black-teal. */
+body.theme-sulaco {
+  --bg: #03080a;
+  --panel: #0a181c;
+  --rule: #18444a;
+  --dim: #2a7a6a;
+  --cyan: #3fe0a0;
+  --amber: #5fd0ff;
+  --gold: #ffcc33;
+  --magenta: #ff2222;
+  --primary-deep: #2a8a6a;
+  --primary-deeper: #0e2a2a;
+  --alarm: #ff2222;
+  --bg-rgb: 3 8 10;
+  --panel-rgb: 10 24 28;
+  --rule-rgb: 24 68 74;
+  --cyan-rgb: 63 224 160;
+  --amber-rgb: 95 208 255;
+  --gold-rgb: 255 204 51;
+  --magenta-rgb: 255 34 34;
+  --alarm-rgb: 255 34 34;
+  --ticker-bg-rgb: 0 28 22;
+  --trace-bg-rgb: 6 26 28;
+  --bg-panel: rgb(var(--panel-rgb) / 0.55);
+  --border: var(--rule);
+  --primary: var(--cyan);
+  --primary-dim: var(--dim);
+  --accent: var(--amber);
+  --warn: var(--gold);
+  --alert: var(--magenta);
+  --header-amber: var(--gold);
+}
+
+/* ALIEN — WEYLAND (corporate deck): corp-yellow primary, amber-orange accent,
+   pale-gold readouts, alert red, on near-black. Clean and bright. */
+body.theme-weyland {
+  --bg: #0c0a03;
+  --panel: #1a160b;
+  --rule: #3e3416;
+  --dim: #a89248;
+  --cyan: #ffcb1f;
+  --amber: #d98a2b;
+  --gold: #ffe27a;
+  --magenta: #e23b2b;
+  --primary-deep: #b8941c;
+  --primary-deeper: #3a3014;
+  --alarm: #e23b2b;
+  --bg-rgb: 12 10 3;
+  --panel-rgb: 26 22 11;
+  --rule-rgb: 62 52 22;
+  --cyan-rgb: 255 203 31;
+  --amber-rgb: 217 138 43;
+  --gold-rgb: 255 226 122;
+  --magenta-rgb: 226 59 43;
+  --alarm-rgb: 226 59 43;
+  --ticker-bg-rgb: 24 18 4;
+  --trace-bg-rgb: 26 20 8;
+  --bg-panel: rgb(var(--panel-rgb) / 0.55);
+  --border: var(--rule);
+  --primary: var(--cyan);
+  --primary-dim: var(--dim);
+  --accent: var(--amber);
+  --warn: var(--gold);
+  --alert: var(--magenta);
+  --header-amber: var(--gold);
+}
+
 * { box-sizing: border-box; }
 
 html, body {
