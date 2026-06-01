@@ -408,7 +408,7 @@ body.theme-muthur   .wy-badge,
 body.theme-sulaco   .wy-badge,
 body.theme-weyland  .wy-badge { display: inline-flex; }
 
-.wy-mark { width: 30px; height: 16px; color: var(--header-amber); flex: none; }
+.wy-mark { width: 44px; height: 18px; color: var(--header-amber); flex: none; }
 .wy-text { display: flex; flex-direction: column; }
 .wy-name {
   font-family: var(--vt);
