@@ -875,6 +875,10 @@ const THEMES = [
   { cls: 'theme-tron-light',       label: 'TRON·LIGHT' },
   { cls: 'theme-cyberpunk-dark',   label: 'CYBER·DARK' },
   { cls: 'theme-cyberpunk-light',  label: 'CYBER·LIGHT' },
+  { cls: 'theme-nostromo',         label: 'NOSTROMO' },
+  { cls: 'theme-muthur',           label: 'MU-TH-UR' },
+  { cls: 'theme-sulaco',           label: 'SULACO' },
+  { cls: 'theme-weyland',          label: 'WEYLAND' },
 ];
 
 function currentThemeIndex() {
