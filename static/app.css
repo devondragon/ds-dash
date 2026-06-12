@@ -259,6 +259,7 @@ body.theme-nostromo {
   --ticker-bg-rgb: 28 16 4;
   --trace-bg-rgb: 26 18 8;
   --glow-strong: 0.55;
+  --glow-soft: 0.4;
 }
 
 /* ALIEN — MU-TH-UR (MOTHER green phosphor): monochrome green, white-mint
@@ -288,6 +289,7 @@ body.theme-muthur {
   --ticker-bg-rgb: 0 24 8;
   --trace-bg-rgb: 4 26 12;
   --glow-strong: 0.65;
+  --glow-soft: 0.45;
 }
 
 /* ALIEN — SULACO (USCM / Colonial Marines): tac-green primary, scanner-cyan
