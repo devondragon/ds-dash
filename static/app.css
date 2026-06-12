@@ -171,14 +171,16 @@ body.theme-tron-light {
   --glow-soft: 0.1;
 }
 
-/* CYBERPUNK 2077 DARK — neon yellow + cyan + hot magenta on near-black */
+/* CYBERPUNK 2077 DARK — neon yellow + cyan + hot magenta on near-black.
+   Accent is the game's secondary orange-red so highlights stay separable
+   from warn-yellow severity states. */
 body.theme-cyberpunk-dark {
   --bg: #06020a;
   --panel: #160c1e;
   --rule: #3a1e50;
   --dim: #8a5ec0;
   --cyan: #00f0ff;
-  --amber: #fcee0a;
+  --amber: #ff6e27;
   --gold: #fcee0a;
   --magenta: #ff0055;
   --primary-deep: #5e3088;
@@ -188,7 +190,7 @@ body.theme-cyberpunk-dark {
   --panel-rgb: 22 12 30;
   --rule-rgb: 58 30 80;
   --cyan-rgb: 0 240 255;
-  --amber-rgb: 252 238 10;
+  --amber-rgb: 255 110 39;
   --gold-rgb: 252 238 10;
   --magenta-rgb: 255 0 85;
   --alarm-rgb: 255 0 85;
