@@ -315,7 +315,10 @@ body.theme-sulaco {
 }
 
 /* ALIEN — WEYLAND (corporate deck): corp-yellow primary, amber-orange accent,
-   pale-gold readouts, alert red, on near-black. Clean and bright. */
+   pale-gold readouts, alert red, on near-black. Clean and bright. --warn is
+   re-pointed to a vivid orange — the pale-gold --gold (kept for the
+   header/timecode) sits too close to the corp-yellow primary for warning
+   states to register. */
 body.theme-weyland {
   --bg: #0c0a03;
   --panel: #1a160b;
@@ -325,6 +328,7 @@ body.theme-weyland {
   --amber: #d98a2b;
   --gold: #ffe27a;
   --magenta: #e23b2b;
+  --warn: #ff8c1a;
   --primary-deep: #b8941c;
   --primary-deeper: #3a3014;
   --alarm: #e23b2b;
