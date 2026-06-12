@@ -133,7 +133,7 @@ Every `STATE["providers"][name]["status"]` is one of:
 | `error`        | last poll raised; result also carries an `error` string                    | shows red `ERR` chip      |
 
 Reserve these five strings — don't invent new ones. The frontend's
-`metaTag` helper in `static/index.html` only recognizes these.
+`metaTag` helper in `static/app.js` only recognizes these.
 
 ## Conventions
 

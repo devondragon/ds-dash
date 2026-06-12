@@ -1,0 +1,11 @@
+# Tool config only — this project is not packaged; it runs from the repo
+# via run.sh. Install deps with requirements.txt / requirements-dev.txt.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120

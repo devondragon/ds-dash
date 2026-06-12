@@ -12,8 +12,17 @@ PYTHON="${PYTHON:-python3}"
 if [ ! -d "$VENV" ]; then
   echo "[ds-dash] creating venv at $VENV"
   "$PYTHON" -m venv "$VENV"
+fi
+
+# (Re)install deps whenever requirements.txt changes — a missing or stale
+# stamp means the venv predates the current requirements.
+STAMP="$VENV/.requirements.sha256"
+REQ_SHA="$(shasum -a 256 requirements.txt | cut -d' ' -f1)"
+if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$REQ_SHA" ]; then
+  echo "[ds-dash] installing dependencies"
   "$VENV/bin/pip" install --upgrade pip wheel >/dev/null
   "$VENV/bin/pip" install -r requirements.txt
+  echo "$REQ_SHA" > "$STAMP"
 fi
 
 # Ensure config exists

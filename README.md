@@ -18,7 +18,7 @@ NIGHTOPS theme (default, dark):
 
 ![NIGHTOPS dashboard](docs/screenshots/dashboard-nightops.png)
 
-TRON·LIGHT theme (one of five — cycle via the `THEME` chip or press `T`):
+TRON·LIGHT theme (one of ten — cycle via the `THEME` chip or press `T`):
 
 ![TRON·LIGHT dashboard](docs/screenshots/dashboard-tron-light.png)
 
@@ -118,9 +118,10 @@ Nothing is written back.
 - **Operator label** — set `[ui].operator_name` in
   `~/.ds-dash/config.toml` to change the `OPERATOR://NAME` header
   text. Falls back to `$USER` if unset.
-- **Themes** — click the THEME chip in the header (or press `T`) to
-  cycle: NIGHTOPS · TRON·DARK · TRON·LIGHT · CYBER·DARK · CYBER·LIGHT.
-  Choice persists in `localStorage`.
+- **Themes** — click the THEME chip in the header (or press `T`;
+  shift-`T` cycles backwards): NIGHTOPS · TRON·DARK · TRON·LIGHT ·
+  CYBER·DARK · CYBER·LIGHT · NOSTROMO · MU-TH-UR · SULACO · WEYLAND ·
+  BLADE·2049. Choice persists in `localStorage`.
 
 ## License
 

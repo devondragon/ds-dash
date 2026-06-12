@@ -249,6 +249,14 @@ def _from_contribution_collection(data: dict) -> list[dict]:
     return out
 
 
+def _exc_brief(e: Exception) -> str:
+    """One-line exception summary; HTTP errors include status + a body snippet."""
+    if isinstance(e, httpx.HTTPStatusError):
+        body = e.response.text[:120].strip() or "(empty body)"
+        return f"HTTP {e.response.status_code}: {body}"
+    return f"{type(e).__name__}: {e}"
+
+
 async def github_poll(token: str, username: str, interval: int) -> None:
     headers = {
         "Authorization": f"Bearer {token}",
@@ -258,166 +266,185 @@ async def github_poll(token: str, username: str, interval: int) -> None:
     }
     prev_total = None
     while True:
-        result: dict[str, Any] = {"username": username, "updated_at": _now_iso()}
-        # Tag of the in-flight call; surfaced in error messages so a transient
-        # failure tells us which of the five endpoints actually broke.
-        current_call: str = ""
+        # Each call below is independently fault-tolerant: a failing call
+        # records which endpoint broke and the panel keeps its previous data
+        # for that section, instead of one bad call wiping all five results.
+        result: dict[str, Any] = {"username": username}
+        errors: list[str] = []
+        public_events: list[dict] | None = None
+        contrib_events: list[dict] | None = None
         try:
             async with httpx.AsyncClient(timeout=30, headers=headers) as c:
                 # PRs awaiting my review
-                current_call = "search/issues (review-requested)"
-                r1 = await c.get(
-                    f"{GITHUB_API}/search/issues",
-                    params={"q": f"is:open is:pr review-requested:{username} archived:false", "per_page": 10},
-                )
-                r1.raise_for_status()
-                d1 = r1.json()
-                result["review_requested"] = {
-                    "count": d1.get("total_count", 0),
-                    "items": [
-                        {
-                            "title": i["title"],
-                            "url": i["html_url"],
-                            "repo": _repo_short(i.get("repository_url", "")),
-                            "updated_at": i["updated_at"],
-                            "number": i.get("number"),
-                        }
-                        for i in d1.get("items", [])[:6]
-                    ],
-                }
+                try:
+                    r1 = await c.get(
+                        f"{GITHUB_API}/search/issues",
+                        params={"q": f"is:open is:pr review-requested:{username} archived:false", "per_page": 10},
+                    )
+                    r1.raise_for_status()
+                    d1 = r1.json()
+                    result["review_requested"] = {
+                        "count": d1.get("total_count", 0),
+                        "items": [
+                            {
+                                "title": i["title"],
+                                "url": i["html_url"],
+                                "repo": _repo_short(i.get("repository_url", "")),
+                                "updated_at": i["updated_at"],
+                                "number": i.get("number"),
+                            }
+                            for i in d1.get("items", [])[:6]
+                        ],
+                    }
+                except Exception as e:
+                    errors.append(f"review-requested: {_exc_brief(e)}")
 
                 # PRs I authored, still open
-                current_call = "search/issues (my open PRs)"
-                r2 = await c.get(
-                    f"{GITHUB_API}/search/issues",
-                    params={"q": f"is:open is:pr author:{username} archived:false", "per_page": 10},
-                )
-                r2.raise_for_status()
-                d2 = r2.json()
-                result["my_open_prs"] = {
-                    "count": d2.get("total_count", 0),
-                    "items": [
-                        {
-                            "title": i["title"],
-                            "url": i["html_url"],
-                            "repo": _repo_short(i.get("repository_url", "")),
-                            "updated_at": i["updated_at"],
-                            "number": i.get("number"),
-                            "draft": i.get("draft", False),
-                        }
-                        for i in d2.get("items", [])[:6]
-                    ],
-                }
+                try:
+                    r2 = await c.get(
+                        f"{GITHUB_API}/search/issues",
+                        params={"q": f"is:open is:pr author:{username} archived:false", "per_page": 10},
+                    )
+                    r2.raise_for_status()
+                    d2 = r2.json()
+                    result["my_open_prs"] = {
+                        "count": d2.get("total_count", 0),
+                        "items": [
+                            {
+                                "title": i["title"],
+                                "url": i["html_url"],
+                                "repo": _repo_short(i.get("repository_url", "")),
+                                "updated_at": i["updated_at"],
+                                "number": i.get("number"),
+                                "draft": i.get("draft", False),
+                            }
+                            for i in d2.get("items", [])[:6]
+                        ],
+                    }
+                except Exception as e:
+                    errors.append(f"my-open-prs: {_exc_brief(e)}")
 
                 # Issues assigned to me
-                current_call = "search/issues (assigned to me)"
-                r3 = await c.get(
-                    f"{GITHUB_API}/search/issues",
-                    params={"q": f"is:open is:issue assignee:{username} archived:false", "per_page": 10},
-                )
-                r3.raise_for_status()
-                d3 = r3.json()
-                result["issues_assigned"] = {
-                    "count": d3.get("total_count", 0),
-                    "items": [
-                        {
-                            "title": i["title"],
-                            "url": i["html_url"],
-                            "repo": _repo_short(i.get("repository_url", "")),
-                            "updated_at": i["updated_at"],
-                            "number": i.get("number"),
-                        }
-                        for i in d3.get("items", [])[:6]
-                    ],
-                }
+                try:
+                    r3 = await c.get(
+                        f"{GITHUB_API}/search/issues",
+                        params={"q": f"is:open is:issue assignee:{username} archived:false", "per_page": 10},
+                    )
+                    r3.raise_for_status()
+                    d3 = r3.json()
+                    result["issues_assigned"] = {
+                        "count": d3.get("total_count", 0),
+                        "items": [
+                            {
+                                "title": i["title"],
+                                "url": i["html_url"],
+                                "repo": _repo_short(i.get("repository_url", "")),
+                                "updated_at": i["updated_at"],
+                                "number": i.get("number"),
+                            }
+                            for i in d3.get("items", [])[:6]
+                        ],
+                    }
+                except Exception as e:
+                    errors.append(f"issues-assigned: {_exc_brief(e)}")
 
                 # Recent public events — stars, public pushes, discussions,
                 # forks. Misses private activity, which contributionsCollection
                 # picks up below.
-                current_call = "users/<login>/events"
-                r5 = await c.get(
-                    f"{GITHUB_API}/users/{username}/events",
-                    params={"per_page": 30},
-                )
-                r5.raise_for_status()
-                public_events = [_summarize_event(e) for e in r5.json() if _summarize_event(e)]
+                try:
+                    r5 = await c.get(
+                        f"{GITHUB_API}/users/{username}/events",
+                        params={"per_page": 30},
+                    )
+                    r5.raise_for_status()
+                    public_events = [s for ev in r5.json() if (s := _summarize_event(ev))]
+                except Exception as e:
+                    errors.append(f"public-events: {_exc_brief(e)}")
 
                 # Recent contributions across public+private repos (PRs opened,
                 # reviews submitted, issues opened, per-repo commit days).
-                current_call = "graphql (recent activity)"
-                since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
-                r_act = await c.post(
-                    GITHUB_GRAPHQL,
-                    json={"query": GRAPHQL_RECENT_ACTIVITY,
-                          "variables": {"login": username, "from": since}},
-                )
-                r_act.raise_for_status()
-                act_payload = r_act.json()
-                if act_payload.get("errors"):
-                    raise RuntimeError(
-                        f"graphql errors: {act_payload['errors'][0].get('message', '?')}"
+                try:
+                    since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+                    r_act = await c.post(
+                        GITHUB_GRAPHQL,
+                        json={"query": GRAPHQL_RECENT_ACTIVITY,
+                              "variables": {"login": username, "from": since}},
                     )
-                contrib_events = _from_contribution_collection(act_payload)
+                    r_act.raise_for_status()
+                    act_payload = r_act.json()
+                    if act_payload.get("errors"):
+                        raise RuntimeError(
+                            f"graphql errors: {act_payload['errors'][0].get('message', '?')}"
+                        )
+                    contrib_events = _from_contribution_collection(act_payload)
+                except Exception as e:
+                    errors.append(f"graphql-activity: {_exc_brief(e)}")
 
-                merged = sorted(
-                    contrib_events + public_events,
-                    key=lambda e: e.get("at", ""),
-                    reverse=True,
-                )
-                seen: set[tuple[str, str]] = set()
-                deduped: list[dict] = []
-                for e in merged:
-                    key = (e.get("kind") or "", e.get("url") or e.get("detail") or "")
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    deduped.append(e)
-                result["recent_events"] = {"items": deduped[:15]}
+                # Merge whichever event feeds we managed to fetch; if both
+                # failed, leave recent_events unset so the previous value
+                # survives the state merge below.
+                if public_events is not None or contrib_events is not None:
+                    merged = sorted(
+                        (contrib_events or []) + (public_events or []),
+                        key=lambda ev: ev.get("at", ""),
+                        reverse=True,
+                    )
+                    seen: set[tuple[str, str]] = set()
+                    deduped: list[dict] = []
+                    for ev in merged:
+                        key = (ev.get("kind") or "", ev.get("url") or ev.get("detail") or "")
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        deduped.append(ev)
+                    result["recent_events"] = {"items": deduped[:15]}
 
                 # Contribution heatmap via GraphQL
-                current_call = "graphql (contribution heatmap)"
-                r4 = await c.post(
-                    GITHUB_GRAPHQL,
-                    json={"query": GRAPHQL_CONTRIBUTIONS, "variables": {"login": username}},
-                )
-                r4.raise_for_status()
-                d4 = r4.json()
-                cal = (
-                    d4.get("data", {}).get("user", {}).get("contributionsCollection", {}).get("contributionCalendar")
-                )
-                if cal:
-                    weeks = cal.get("weeks", [])[-20:]
-                    days = []
-                    for w in weeks:
-                        for d in w.get("contributionDays", []):
-                            days.append({"date": d["date"], "count": d["contributionCount"]})
-                    result["heatmap"] = {
-                        "total_year": cal.get("totalContributions", 0),
-                        "recent_days": days,
-                    }
-                    today_iso = datetime.now().strftime("%Y-%m-%d")
-                    result["commits_today"] = next((d["count"] for d in days if d["date"] == today_iso), 0)
-                    # Surface a delta to the ticker
-                    if prev_total is not None and cal["totalContributions"] > prev_total:
-                        diff = cal["totalContributions"] - prev_total
-                        _push_ticker("github", f"+{diff} contribution{'s' if diff != 1 else ''}", "info")
-                    prev_total = cal["totalContributions"]
-
-            result["status"] = "ok"
-            STATE["providers"]["github"] = result
-        except httpx.HTTPStatusError as e:
-            body = e.response.text[:200].strip() or "(empty body)"
-            STATE["providers"]["github"] = {
-                "status": "error",
-                "error": f"HTTP {e.response.status_code} on {current_call or 'unknown'}: {body}",
-                "updated_at": _now_iso(),
-            }
+                try:
+                    r4 = await c.post(
+                        GITHUB_GRAPHQL,
+                        json={"query": GRAPHQL_CONTRIBUTIONS, "variables": {"login": username}},
+                    )
+                    r4.raise_for_status()
+                    d4 = r4.json()
+                    cal = (
+                        d4.get("data", {}).get("user", {}).get("contributionsCollection", {}).get("contributionCalendar")
+                    )
+                    if cal:
+                        weeks = cal.get("weeks", [])[-20:]
+                        days = []
+                        for w in weeks:
+                            for d in w.get("contributionDays", []):
+                                days.append({"date": d["date"], "count": d["contributionCount"]})
+                        result["heatmap"] = {
+                            "total_year": cal.get("totalContributions", 0),
+                            "recent_days": days,
+                        }
+                        today_iso = datetime.now().strftime("%Y-%m-%d")
+                        result["commits_today"] = next((d["count"] for d in days if d["date"] == today_iso), 0)
+                        # Surface a delta to the ticker
+                        if prev_total is not None and cal["totalContributions"] > prev_total:
+                            diff = cal["totalContributions"] - prev_total
+                            _push_ticker("github", f"+{diff} contribution{'s' if diff != 1 else ''}", "info")
+                        prev_total = cal["totalContributions"]
+                except Exception as e:
+                    errors.append(f"graphql-heatmap: {_exc_brief(e)}")
         except Exception as e:
-            STATE["providers"]["github"] = {
-                "status": "error",
-                "error": f"{type(e).__name__} on {current_call or 'unknown'}: {e}",
-                "updated_at": _now_iso(),
-            }
+            errors.append(f"client: {_exc_brief(e)}")
+
+        # Linear-style merge over the last-known state: sections that failed
+        # this round keep their previous data; the ERR chip still surfaces
+        # with the per-endpoint detail in the error string.
+        prev_state = STATE["providers"]["github"] or {}
+        merged_state = {k: v for k, v in prev_state.items() if k not in ("status", "error", "message")}
+        merged_state.update(result)
+        merged_state["updated_at"] = _now_iso()
+        if errors:
+            merged_state["status"] = "error"
+            merged_state["error"] = "; ".join(errors)[:300]
+        else:
+            merged_state["status"] = "ok"
+        STATE["providers"]["github"] = merged_state
         await asyncio.sleep(interval)
 
 
@@ -815,6 +842,22 @@ def _motion_to_item(t: dict) -> dict:
     }
 
 
+def _motion_dedup_recurring(active: list[dict]) -> list[dict]:
+    """Collapse recurring task occurrences to one row per template: keep only
+    the earliest-due instance per parentRecurringTaskId. Non-recurring tasks
+    get their own task id as the dedup key; tasks with neither are dropped.
+    Returns the survivors sorted by priority + due date."""
+    by_key: dict[str, dict] = {}
+    for t in active:
+        key = t.get("parentRecurringTaskId") or t.get("id") or ""
+        if not key:
+            continue
+        existing = by_key.get(key)
+        if not existing or (t.get("dueDate") or "9999") < (existing.get("dueDate") or "9999"):
+            by_key[key] = t
+    return sorted(by_key.values(), key=_motion_sort_key)
+
+
 async def motion_poll(api_key: str, interval: int = 60) -> None:
     """Poll Motion tasks (pageSize ~50). Filters to active (not completed,
     not in a resolved status), sorts by priority + due, sends top N to
@@ -833,18 +876,7 @@ async def motion_poll(api_key: str, interval: int = 60) -> None:
                 if not t.get("completed")
                 and not (t.get("status") or {}).get("isResolvedStatus")
             ]
-            # Collapse recurring task occurrences to one row per template:
-            # keep only the earliest-due instance per parentRecurringTaskId.
-            # Non-recurring tasks get their own task id as the dedup key.
-            by_key: dict[str, dict] = {}
-            for t in active:
-                key = t.get("parentRecurringTaskId") or t.get("id") or ""
-                if not key:
-                    continue
-                existing = by_key.get(key)
-                if not existing or (t.get("dueDate") or "9999") < (existing.get("dueDate") or "9999"):
-                    by_key[key] = t
-            deduped = sorted(by_key.values(), key=_motion_sort_key)
+            deduped = _motion_dedup_recurring(active)
             STATE["providers"]["tasks"] = {
                 "status": "ok",
                 "updated_at": _now_iso(),
@@ -1185,7 +1217,11 @@ async def _fetch_claude_usage_headers(access_token: str, probe_model: str) -> di
     }
     async with httpx.AsyncClient(timeout=20) as c:
         r = await c.post(_CLAUDE_USAGE_URL, headers=headers, json=body)
-        r.raise_for_status()
+        # A 429 means a window is exhausted — exactly when this panel matters
+        # most — and the response still carries the usage headers. Parse them;
+        # only raise if they're absent (a real error, not a quota response).
+        if r.status_code != 429 or "anthropic-ratelimit-unified-5h-utilization" not in r.headers:
+            r.raise_for_status()
 
     def _hf(name: str) -> float:
         try:
@@ -1221,8 +1257,9 @@ async def _fetch_claude_usage_headers(access_token: str, probe_model: str) -> di
 
 
 def _scan_cc_sessions() -> dict:
-    """Walk ~/.claude/projects/**/*.jsonl mtimes for live/idle/today counts.
-    Only stats files (no reads), so this is cheap even with hundreds of sessions.
+    """Scan ~/.claude/projects/<project>/*.jsonl mtimes (one directory level)
+    for live/idle/today counts. Only stats files (no reads), so this is cheap
+    even with hundreds of sessions.
     """
     out = {"cc_live": 0, "cc_idle": 0, "cc_today": 0}
     if not CLAUDE_PROJECTS_ROOT.is_dir():
@@ -1268,9 +1305,12 @@ async def claude_poll(interval: int = 300, probe_model: str = _CLAUDE_PROBE_MODE
     usage-fetch failure) so that panel stays live.
     """
     while True:
-        sessions = _scan_cc_sessions()
+        # Both helpers do blocking work (filesystem walk, keychain subprocess
+        # with a 3s timeout) — run them off the event loop so a slow keychain
+        # can't stall every other panel and the HTTP server.
+        sessions = await asyncio.to_thread(_scan_cc_sessions)
         try:
-            creds = _read_claude_oauth()
+            creds = await asyncio.to_thread(_read_claude_oauth)
             if not creds:
                 STATE["providers"]["claude"] = {
                     "status": "error",
@@ -1351,15 +1391,17 @@ async def system_poll(interval: int = 5) -> None:
     # is on /System/Volumes/Data. Fall back to "/" on Linux / older macOS.
     disk_root = "/System/Volumes/Data" if os.path.isdir("/System/Volumes/Data") else "/"
 
-    # Prime cpu_percent so the first real value isn't 0.0
-    psutil.cpu_percent(interval=None)
-    # Prime per-process CPU counters too so the first sampled poll has real values
-    # rather than zeros for every PID.
-    for _p in psutil.process_iter():
-        try:
-            _p.cpu_percent(interval=None)
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            pass
+    def _prime_cpu_counters() -> None:
+        # Prime cpu_percent so the first real value isn't 0.0, and per-process
+        # counters so the first sampled poll has real values rather than zeros.
+        psutil.cpu_percent(interval=None)
+        for _p in psutil.process_iter():
+            try:
+                _p.cpu_percent(interval=None)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+
+    await asyncio.to_thread(_prime_cpu_counters)
     prev_net = psutil.net_io_counters()
     prev_ts = time.monotonic()
     history: list[dict] = []
@@ -1381,7 +1423,9 @@ async def system_poll(interval: int = 5) -> None:
             hours, rem = divmod(rem, 3600)
             mins = rem // 60
 
-            top_cpu, top_mem = _top_processes()
+            # process_iter walks every PID — the slowest psutil call here, so
+            # keep it off the event loop.
+            top_cpu, top_mem = await asyncio.to_thread(_top_processes)
 
             STATE["providers"]["system"] = {
                 "status": "ok",
@@ -1415,6 +1459,7 @@ async def services_poll(interval: int = 300) -> None:
         "linear":    "https://linearstatus.com/api/v2/summary.json",
         "vercel":    "https://www.vercel-status.com/api/v2/summary.json",
     }
+    prev_indicators: dict[str, str] = {}
     while True:
         results = {}
         async with httpx.AsyncClient(timeout=15, headers={"User-Agent": "ds-dash/0.1"}) as c:
@@ -1428,6 +1473,21 @@ async def services_poll(interval: int = 300) -> None:
                     results[name] = {"indicator": indicator, "description": description}
                 except Exception as e:
                     results[name] = {"indicator": "unknown", "description": str(e)[:100]}
+        # Ticker on real status transitions only. "unknown" (our fetch failed)
+        # is neither recorded nor announced, so a transient network blip can't
+        # fake a degradation/recovery pair.
+        for name, info in results.items():
+            ind = info.get("indicator", "unknown")
+            if ind == "unknown":
+                continue
+            old = prev_indicators.get(name)
+            if old is not None and ind != old:
+                if ind == "none":
+                    _push_ticker("services", f"{name} status recovered", "info")
+                else:
+                    level = "warn" if ind == "minor" else "alert"
+                    _push_ticker("services", f"{name} status {ind.upper()}", level)
+            prev_indicators[name] = ind
         STATE["providers"]["services"] = {
             "status": "ok",
             "updated_at": _now_iso(),
@@ -1517,20 +1577,22 @@ async def network_poll(token: str | None = None, interval: int = 300) -> None:
         except httpx.HTTPStatusError as e:
             # Even if ipinfo fails (rate-limit, offline), local VPN detection
             # still works — surface that and report the error separately.
+            vpn_ifaces = _detect_vpn_interfaces()
             STATE["providers"]["network"] = {
                 "status": "error",
                 "updated_at": _now_iso(),
                 "error": f"HTTP {e.response.status_code}: {e.response.text[:120]}",
-                "vpn_active": bool(_detect_vpn_interfaces()),
-                "vpn_ifaces": _detect_vpn_interfaces(),
+                "vpn_active": bool(vpn_ifaces),
+                "vpn_ifaces": vpn_ifaces,
             }
         except Exception as e:
+            vpn_ifaces = _detect_vpn_interfaces()
             STATE["providers"]["network"] = {
                 "status": "error",
                 "updated_at": _now_iso(),
                 "error": f"{type(e).__name__}: {e}",
-                "vpn_active": bool(_detect_vpn_interfaces()),
-                "vpn_ifaces": _detect_vpn_interfaces(),
+                "vpn_active": bool(vpn_ifaces),
+                "vpn_ifaces": vpn_ifaces,
             }
         await asyncio.sleep(interval)
 
@@ -1647,10 +1709,32 @@ async def weather_poll(zip_code: str, country: str = "US",
                 "zip": zip_code,
             }
         except httpx.HTTPStatusError as e:
+            # A 404 before we ever geocoded means an unknown postal code —
+            # a permanent config problem, not a transient failure. Don't retry.
+            if geo is None and e.response.status_code == 404:
+                STATE["providers"]["weather"] = {
+                    "status": "unconfigured",
+                    "message": f"unknown postal code {country}/{zip_code} — fix [weather] zip in config.toml",
+                }
+                return
             STATE["providers"]["weather"] = {
                 "status": "error",
                 "updated_at": _now_iso(),
                 "error": f"HTTP {e.response.status_code}: {e.response.text[:120]}",
+                "zip": zip_code,
+            }
+        except ValueError as e:
+            # zippopotam answered 200 but with no usable place — also permanent.
+            if geo is None:
+                STATE["providers"]["weather"] = {
+                    "status": "unconfigured",
+                    "message": f"{e} — fix [weather] zip in config.toml",
+                }
+                return
+            STATE["providers"]["weather"] = {
+                "status": "error",
+                "updated_at": _now_iso(),
+                "error": f"ValueError: {e}",
                 "zip": zip_code,
             }
         except Exception as e:
@@ -1871,7 +1955,9 @@ def main() -> None:
             file=sys.stderr,
         )
     print(f"[ds-dash] listening on http://{host}:{port}")
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    # access_log=False: the frontend hits /api/state.json every 5s, so logging
+    # each request is pure noise. Startup/shutdown still log at info.
+    uvicorn.run(app, host=host, port=port, log_level="info", access_log=False)
 
 
 if __name__ == "__main__":
