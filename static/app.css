@@ -117,7 +117,11 @@
    palette and its rgb-triplet counterparts.
    ============================================================ */
 
-/* TRON LEGACY DARK — true-black grid with electric blue, Clu orange used sparingly */
+/* TRON LEGACY DARK — true-black grid with electric blue, Clu orange used
+   sparingly. --gold stays ice-blue for the header/timecode, so --warn is
+   re-pointed to a light Clu orange — otherwise warnings render in a cool
+   tone indistinguishable from primary text. Magenta is End-of-Line neon,
+   distinct from the alarm red. */
 body.theme-tron-dark {
   --bg: #000308;
   --panel: #001220;
@@ -126,7 +130,8 @@ body.theme-tron-dark {
   --cyan: #6fc3df;
   --amber: #ff7a00;
   --gold: #c5eaff;
-  --magenta: #ff4a4a;
+  --magenta: #ff2a86;
+  --warn: #ffa64d;
   --primary-deep: #1d5470;
   --primary-deeper: #0a3a50;
   --alarm: #ff4a4a;
@@ -136,7 +141,7 @@ body.theme-tron-dark {
   --cyan-rgb: 111 195 223;
   --amber-rgb: 255 122 0;
   --gold-rgb: 197 234 255;
-  --magenta-rgb: 255 74 74;
+  --magenta-rgb: 255 42 134;
   --alarm-rgb: 255 74 74;
   --ticker-bg-rgb: 0 20 35;
   --trace-bg-rgb: 5 28 48;
