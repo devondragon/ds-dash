@@ -879,6 +879,7 @@ const THEMES = [
   { cls: 'theme-muthur',           label: 'MU-TH-UR' },
   { cls: 'theme-sulaco',           label: 'SULACO' },
   { cls: 'theme-weyland',          label: 'WEYLAND' },
+  { cls: 'theme-blade2049',        label: 'BLADE·2049' },
 ];
 
 function currentThemeIndex() {

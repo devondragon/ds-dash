@@ -399,6 +399,43 @@ body.theme-weyland {
   --header-amber: var(--gold);
 }
 
+/* BLADE RUNNER 2049 — the Vegas sequence: hazy ember-orange primary, ice-teal
+   accent (K's spinner HUD), Joi-neon magenta alerts, on warm fog-black.
+   Glow pushed up for the film's diffusion bloom. */
+body.theme-blade2049 {
+  --bg: #0a0505;
+  --panel: #170d0a;
+  --rule: #3e261a;
+  --dim: #b07a52;
+  --cyan: #ef8d3e;
+  --amber: #5fd8d2;
+  --gold: #ffc98a;
+  --magenta: #ff2e92;
+  --primary-deep: #a8602a;
+  --primary-deeper: #3a2412;
+  --alarm: #ff3b5c;
+  --bg-rgb: 10 5 5;
+  --panel-rgb: 23 13 10;
+  --rule-rgb: 62 38 26;
+  --cyan-rgb: 239 141 62;
+  --amber-rgb: 95 216 210;
+  --gold-rgb: 255 201 138;
+  --magenta-rgb: 255 46 146;
+  --alarm-rgb: 255 59 92;
+  --ticker-bg-rgb: 30 12 16;
+  --trace-bg-rgb: 28 18 14;
+  --glow-strong: 0.6;
+  --glow-soft: 0.42;
+  --bg-panel: rgb(var(--panel-rgb) / 0.55);
+  --border: var(--rule);
+  --primary: var(--cyan);
+  --primary-dim: var(--dim);
+  --accent: var(--amber);
+  --warn: var(--gold);
+  --alert: var(--magenta);
+  --header-amber: var(--gold);
+}
+
 /* Weyland-Yutani header badge — hidden everywhere except the four Alien
    themes, which flip it to inline-flex below. Color tracks --header-amber so
    it recolors per theme (amber/green/teal/gold). */
