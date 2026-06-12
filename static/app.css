@@ -32,7 +32,10 @@
   --glow-strong: 0.5;
   --glow-soft: 0.35;
 
-  /* Aliases so existing rules adopt the new palette without rewrites */
+  /* Aliases so existing rules adopt the palette without rewrites. The body
+     rule after the theme blocks re-declares these so they track per-theme
+     palettes; this :root copy only covers the html element itself (its own
+     background/color resolve before body's custom properties exist). */
   --bg-panel: rgb(var(--panel-rgb) / 0.55);
   --border: var(--rule);
   --primary: var(--cyan);
@@ -114,7 +117,11 @@
    palette and its rgb-triplet counterparts.
    ============================================================ */
 
-/* TRON LEGACY DARK — true-black grid with electric blue, Clu orange used sparingly */
+/* TRON LEGACY DARK — true-black grid with electric blue, Clu orange used
+   sparingly. --gold stays ice-blue for the header/timecode, so --warn is
+   re-pointed to a light Clu orange — otherwise warnings render in a cool
+   tone indistinguishable from primary text. Magenta is End-of-Line neon,
+   distinct from the alarm red. */
 body.theme-tron-dark {
   --bg: #000308;
   --panel: #001220;
@@ -123,7 +130,8 @@ body.theme-tron-dark {
   --cyan: #6fc3df;
   --amber: #ff7a00;
   --gold: #c5eaff;
-  --magenta: #ff4a4a;
+  --magenta: #ff2a86;
+  --warn: #ffa64d;
   --primary-deep: #1d5470;
   --primary-deeper: #0a3a50;
   --alarm: #ff4a4a;
@@ -133,23 +141,10 @@ body.theme-tron-dark {
   --cyan-rgb: 111 195 223;
   --amber-rgb: 255 122 0;
   --gold-rgb: 197 234 255;
-  --magenta-rgb: 255 74 74;
+  --magenta-rgb: 255 42 134;
   --alarm-rgb: 255 74 74;
   --ticker-bg-rgb: 0 20 35;
   --trace-bg-rgb: 5 28 48;
-  /* Aliases — MUST be redeclared in every theme. CSS custom-property
-     var() substitution resolves on the *declaring element*, not at use
-     site (CSS Variables Level 1, §3.2). Declared only in :root, the
-     aliases would lock to :root's --cyan/--amber/--gold/--magenta and
-     never pick up theme overrides. */
-  --bg-panel: rgb(var(--panel-rgb) / 0.55);
-  --border: var(--rule);
-  --primary: var(--cyan);
-  --primary-dim: var(--dim);
-  --accent: var(--amber);
-  --warn: var(--gold);
-  --alert: var(--magenta);
-  --header-amber: var(--gold);
 }
 
 /* TRON LEGACY LIGHT — the white-room arena scenes: cool-white field with grid blue.
@@ -179,24 +174,18 @@ body.theme-tron-light {
   --scanline-alpha: 0.015;
   --glow-strong: 0.15;
   --glow-soft: 0.1;
-  --bg-panel: rgb(var(--panel-rgb) / 0.55);
-  --border: var(--rule);
-  --primary: var(--cyan);
-  --primary-dim: var(--dim);
-  --accent: var(--amber);
-  --warn: var(--gold);
-  --alert: var(--magenta);
-  --header-amber: var(--gold);
 }
 
-/* CYBERPUNK 2077 DARK — neon yellow + cyan + hot magenta on near-black */
+/* CYBERPUNK 2077 DARK — neon yellow + cyan + hot magenta on near-black.
+   Accent is the game's secondary orange-red so highlights stay separable
+   from warn-yellow severity states. */
 body.theme-cyberpunk-dark {
   --bg: #06020a;
   --panel: #160c1e;
   --rule: #3a1e50;
   --dim: #8a5ec0;
   --cyan: #00f0ff;
-  --amber: #fcee0a;
+  --amber: #ff6e27;
   --gold: #fcee0a;
   --magenta: #ff0055;
   --primary-deep: #5e3088;
@@ -206,7 +195,7 @@ body.theme-cyberpunk-dark {
   --panel-rgb: 22 12 30;
   --rule-rgb: 58 30 80;
   --cyan-rgb: 0 240 255;
-  --amber-rgb: 252 238 10;
+  --amber-rgb: 255 110 39;
   --gold-rgb: 252 238 10;
   --magenta-rgb: 255 0 85;
   --alarm-rgb: 255 0 85;
@@ -214,14 +203,6 @@ body.theme-cyberpunk-dark {
   --trace-bg-rgb: 26 14 36;
   --glow-strong: 0.7;
   --glow-soft: 0.45;
-  --bg-panel: rgb(var(--panel-rgb) / 0.55);
-  --border: var(--rule);
-  --primary: var(--cyan);
-  --primary-dim: var(--dim);
-  --accent: var(--amber);
-  --warn: var(--gold);
-  --alert: var(--magenta);
-  --header-amber: var(--gold);
 }
 
 /* EDGERUNNERS LIGHT — chromatic high-contrast: pale lavender field + saturated magenta/yellow.
@@ -251,14 +232,6 @@ body.theme-cyberpunk-light {
   --scanline-alpha: 0.018;
   --glow-strong: 0.16;
   --glow-soft: 0.1;
-  --bg-panel: rgb(var(--panel-rgb) / 0.55);
-  --border: var(--rule);
-  --primary: var(--cyan);
-  --primary-dim: var(--dim);
-  --accent: var(--amber);
-  --warn: var(--gold);
-  --alert: var(--magenta);
-  --header-amber: var(--gold);
 }
 
 /* ALIEN — NOSTROMO (Isolation amber CRT): amber phosphor primary, W-Y blue
@@ -286,25 +259,20 @@ body.theme-nostromo {
   --ticker-bg-rgb: 28 16 4;
   --trace-bg-rgb: 26 18 8;
   --glow-strong: 0.55;
-  --bg-panel: rgb(var(--panel-rgb) / 0.55);
-  --border: var(--rule);
-  --primary: var(--cyan);
-  --primary-dim: var(--dim);
-  --accent: var(--amber);
-  --warn: var(--gold);
-  --alert: var(--magenta);
-  --header-amber: var(--gold);
+  --glow-soft: 0.4;
 }
 
-/* ALIEN — MU-TH-UR (MOTHER green phosphor): monochrome green, mint accent,
-   amber as the lone warm warning, red alarms. Strong phosphor bloom. */
+/* ALIEN — MU-TH-UR (MOTHER green phosphor): monochrome green, white-mint
+   accent (bright enough to read against the green primary while staying
+   in-phosphor), amber as the lone warm warning, red alarms. Strong
+   phosphor bloom. */
 body.theme-muthur {
   --bg: #020600;
   --panel: #06120a;
   --rule: #114022;
   --dim: #1f8a44;
   --cyan: #33ff66;
-  --amber: #66ffaa;
+  --amber: #ccffdd;
   --gold: #ffb000;
   --magenta: #ff4030;
   --primary-deep: #1f7a3a;
@@ -314,21 +282,14 @@ body.theme-muthur {
   --panel-rgb: 6 18 10;
   --rule-rgb: 17 64 34;
   --cyan-rgb: 51 255 102;
-  --amber-rgb: 102 255 170;
+  --amber-rgb: 204 255 221;
   --gold-rgb: 255 176 0;
   --magenta-rgb: 255 64 48;
   --alarm-rgb: 255 64 48;
   --ticker-bg-rgb: 0 24 8;
   --trace-bg-rgb: 4 26 12;
   --glow-strong: 0.65;
-  --bg-panel: rgb(var(--panel-rgb) / 0.55);
-  --border: var(--rule);
-  --primary: var(--cyan);
-  --primary-dim: var(--dim);
-  --accent: var(--amber);
-  --warn: var(--gold);
-  --alert: var(--magenta);
-  --header-amber: var(--gold);
+  --glow-soft: 0.45;
 }
 
 /* ALIEN — SULACO (USCM / Colonial Marines): tac-green primary, scanner-cyan
@@ -355,18 +316,13 @@ body.theme-sulaco {
   --alarm-rgb: 255 34 34;
   --ticker-bg-rgb: 0 28 22;
   --trace-bg-rgb: 6 26 28;
-  --bg-panel: rgb(var(--panel-rgb) / 0.55);
-  --border: var(--rule);
-  --primary: var(--cyan);
-  --primary-dim: var(--dim);
-  --accent: var(--amber);
-  --warn: var(--gold);
-  --alert: var(--magenta);
-  --header-amber: var(--gold);
 }
 
 /* ALIEN — WEYLAND (corporate deck): corp-yellow primary, amber-orange accent,
-   pale-gold readouts, alert red, on near-black. Clean and bright. */
+   pale-gold readouts, alert red, on near-black. Clean and bright. --warn is
+   re-pointed to a vivid orange — the pale-gold --gold (kept for the
+   header/timecode) sits too close to the corp-yellow primary for warning
+   states to register. */
 body.theme-weyland {
   --bg: #0c0a03;
   --panel: #1a160b;
@@ -376,6 +332,7 @@ body.theme-weyland {
   --amber: #d98a2b;
   --gold: #ffe27a;
   --magenta: #e23b2b;
+  --warn: #ff8c1a;
   --primary-deep: #b8941c;
   --primary-deeper: #3a3014;
   --alarm: #e23b2b;
@@ -389,14 +346,6 @@ body.theme-weyland {
   --alarm-rgb: 226 59 43;
   --ticker-bg-rgb: 24 18 4;
   --trace-bg-rgb: 26 20 8;
-  --bg-panel: rgb(var(--panel-rgb) / 0.55);
-  --border: var(--rule);
-  --primary: var(--cyan);
-  --primary-dim: var(--dim);
-  --accent: var(--amber);
-  --warn: var(--gold);
-  --alert: var(--magenta);
-  --header-amber: var(--gold);
 }
 
 /* BLADE RUNNER 2049 — the Vegas sequence: hazy ember-orange primary, ice-teal
@@ -426,6 +375,15 @@ body.theme-blade2049 {
   --trace-bg-rgb: 28 18 14;
   --glow-strong: 0.6;
   --glow-soft: 0.42;
+}
+
+/* Aliases — declared once on body, where the theme classes live. var()
+   substitution resolves on the *declaring element* (CSS Variables Level 1,
+   §3.2), so on body these pick up each body.theme-* palette override without
+   being copy-pasted into every theme block. A theme can still re-point an
+   individual alias (e.g. --warn) in its own block: body.theme-* out-cascades
+   plain body. */
+body {
   --bg-panel: rgb(var(--panel-rgb) / 0.55);
   --border: var(--rule);
   --primary: var(--cyan);
