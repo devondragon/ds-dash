@@ -159,7 +159,7 @@ be redeclared inside every theme block.** CSS `var()` substitution
 resolves on the *declaring element*, not at use site (CSS Variables
 Level 1 §3.2). An alias declared only in `:root` locks to `:root`'s
 value and never picks up theme overrides. Every theme re-declares the
-alias block at the bottom — verified empirically across all four themes.
+alias block at the bottom — verified empirically across the themes.
 Keep it that way.
 
 **Tier 3 — scale + component tokens** declared once in `:root`,

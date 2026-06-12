@@ -178,7 +178,7 @@ function renderTasks(p) {
   el('tasks-meta').textContent = (p.open_count ?? items.length) + ' OPEN' + (p.status === 'mocked' ? ' · MOCK' : '');
   const rows = items.map(t => {
     const pri = t.priority === 'high' ? '!' : ' ';
-    const dueCls = t.due === 'TODAY' ? 'warn' : (/\d+D$/.test(t.due || '') ? 'alert' : 'dim');
+    const dueCls = t.due === 'OVERDUE' ? 'alert' : (t.due === 'TODAY' ? 'warn' : 'dim');
     const urlAttr = t.url ? ` data-url="${escapeHtml(t.url)}"` : '';
     return `<div class="task"${urlAttr}>
       <span class="pri">${pri}</span>
@@ -342,9 +342,7 @@ function renderLinearPanel(label, safe, p) {
   } else {
     html += items.map(it => {
       const pri = it.priority === 'high' ? '!' : ' ';
-      const dueCls = it.due === 'TODAY' ? 'warn'
-                    : (it.due === 'OVERDUE' ? 'alert'
-                    : (/\d+D$/.test(it.due || '') ? 'alert' : 'dim'));
+      const dueCls = it.due === 'OVERDUE' ? 'alert' : (it.due === 'TODAY' ? 'warn' : 'dim');
       const ident = it.identifier ? '<span class="dim">' + escapeHtml(it.identifier) + '</span> ' : '';
       const urlAttr = it.url ? ' data-url="' + escapeHtml(it.url) + '"' : '';
       return '<div class="task"' + urlAttr + '>'
@@ -457,10 +455,19 @@ function renderGithub(p) {
     return;
   }
   if (p.status === 'error') {
-    setHtml('github-body', `<div class="err">${escapeHtml(p.error || 'error')}</div>`);
-    return;
+    // The daemon merges partial results over last-known data, so an error
+    // usually still comes with renderable sections. Keep showing them; the
+    // meta chip reads ERR and hovering it reveals the error detail.
+    const hasData = !!(p.review_requested || p.my_open_prs || p.issues_assigned || p.recent_events);
+    el('github-meta').title = p.error || '';
+    if (!hasData) {
+      setHtml('github-body', `<div class="err">${escapeHtml(p.error || 'error')}</div>`);
+      return;
+    }
+  } else {
+    el('github-meta').textContent = '@' + (p.username || '—');
+    el('github-meta').title = '';
   }
-  el('github-meta').textContent = '@' + (p.username || '—');
   setHtml('github-body', renderGithubView(p));
 }
 
@@ -490,7 +497,7 @@ function renderHeatmap(p) {
     return;
   }
   const days = (p.heatmap.recent_days || []).slice(-140); // 20 weeks
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = localYMD(new Date()); // local date — UTC marks the wrong day every evening
   const maxCount = Math.max(1, ...days.map(d => d.count));
   // group into 7-day columns to look like a calendar grid (rotated)
   // 20 columns (weeks) x 7 rows (days)
@@ -663,7 +670,9 @@ function renderTicker(events) {
 // Polling loop
 //------------------------------------------------------------------
 
-let lastTickerLen = -1;
+// Length alone can't detect new events once the daemon caps the ticker at 50,
+// so key on newest-event timestamp + length.
+let lastTickerKey = '';
 
 //------------------------------------------------------------------
 // Network panel — WAN ip / ISP / region / VPN
@@ -825,9 +834,16 @@ document.addEventListener('click', e => {
   window.open(url, '_blank', 'noopener,noreferrer');
 });
 
+const POLL_MS = 5000;
+
 async function poll() {
+  // Abort a hung fetch before the next cycle; rescheduling from `finally`
+  // (instead of setInterval) means slow responses never stack overlapping
+  // requests.
+  const ctrl = new AbortController();
+  const abortTimer = setTimeout(() => ctrl.abort(), POLL_MS - 500);
   try {
-    const r = await fetch('/api/state.json', { cache: 'no-store' });
+    const r = await fetch('/api/state.json', { cache: 'no-store', signal: ctrl.signal });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const s = await r.json();
     document.body.classList.remove('offline');
@@ -853,14 +869,19 @@ async function poll() {
     renderRail(p.system);
     renderLeftRail(p);
 
-    if ((s.ticker || []).length !== lastTickerLen) {
-      renderTicker(s.ticker || []);
-      lastTickerLen = (s.ticker || []).length;
+    const ticker = s.ticker || [];
+    const tickerKey = ticker.length + ':' + (ticker[0] ? ticker[0].ts : '');
+    if (tickerKey !== lastTickerKey) {
+      renderTicker(ticker);
+      lastTickerKey = tickerKey;
     }
   } catch (e) {
     document.body.classList.add('offline');
     el('connection').textContent = 'OFFLINE';
     console.warn('poll failed:', e);
+  } finally {
+    clearTimeout(abortTimer);
+    setTimeout(poll, POLL_MS);
   }
 }
 
@@ -921,5 +942,4 @@ renderClock();
 setInterval(renderClock, 1000);
 
 poll();
-setInterval(poll, 5000);
 loadScratchpad();

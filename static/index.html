@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=3">
+<link rel="stylesheet" href="/app.css">
 </head>
 <body>
 <script>
@@ -20,7 +20,9 @@
       var t = localStorage.getItem('cw-theme');
       if (t) {
         document.body.classList.add(t);
-      } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      } else if (t === null && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        // null = never picked. Empty string is a real pick (NIGHTOPS, the
+        // classless default) and must not fall through to OS preference.
         document.body.classList.add('theme-tron-light');
       }
     } catch (e) { /* localStorage or matchMedia blocked — fall through to default */ }
@@ -257,6 +259,6 @@
   </div>
 </div>
 
-<script src="/app.js?v=2"></script>
+<script src="/app.js"></script>
 </body>
 </html>
