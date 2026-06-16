@@ -696,6 +696,24 @@ def _annotate_now_next(events: list[dict]) -> None:
         upcoming[0][1]["is_next"] = True
 
 
+async def _communicate_or_kill(proc, timeout: float) -> tuple[bytes, bytes]:
+    """Await ``proc.communicate()`` with a timeout, reaping the child on timeout.
+
+    ``asyncio.wait_for`` cancels the pending ``communicate()`` but leaves the
+    spawned process running with its stdout/stderr pipes still open. Over many
+    poll cycles those leaked descriptors (plus the unreaped zombie) erode the
+    process's already-tight fd budget. Kill and reap the child before
+    re-raising so the caller still records the timeout as an error.
+    """
+    try:
+        return await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except asyncio.TimeoutError:
+        proc.kill()
+        with contextlib.suppress(Exception):
+            await proc.wait()
+        raise
+
+
 async def calendar_poll(ical_buddy: str, look_ahead_days: int = 1, interval: int = 60) -> None:
     """Poll macOS Calendar via ical-buddy. Uses argv (no shell) — args are
     trusted (path from config or auto-detect; rest are static flags)."""
@@ -718,7 +736,7 @@ async def calendar_poll(ical_buddy: str, look_ahead_days: int = 1, interval: int
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
+            stdout, stderr = await _communicate_or_kill(proc, 10)
             if proc.returncode != 0:
                 STATE["providers"]["calendar"] = {
                     "status": "error",
@@ -1938,8 +1956,48 @@ if STATIC_DIR.exists():
     app.mount("/", NoCacheStaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 
 
+def _raise_fd_limit(target: int = 16384) -> tuple[int, int]:
+    """Raise this process's open-file soft limit toward ``target``.
+
+    The daemon runs one asyncio network poller per provider plus the uvicorn
+    server, so a transient burst — sleep/wake socket churn, dashboard clients
+    reconnecting, DNS retries — can briefly need far more descriptors than the
+    macOS default soft limit of 256. We inherit whatever limit our launcher
+    set (256 under launchd/Finder, higher under a shell), so raise it ourselves
+    rather than depend on the ambient environment; otherwise the panels surface
+    "OSError: too many open files" the first time several pollers fire at once.
+
+    Returns ``(old_soft, new_soft)``. Never lowers an already-higher limit, and
+    is a no-op (equal values) where it can't help (non-POSIX, or setrlimit
+    refused).
+    """
+    try:
+        import resource
+    except ImportError:  # non-POSIX (e.g. Windows) — no rlimits to manage
+        return (0, 0)
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    want = target if hard == resource.RLIM_INFINITY else min(target, hard)
+    if want <= soft:
+        return (soft, soft)
+    for new_hard in (hard, want):
+        # macOS rejects RLIM_INFINITY as the NOFILE hard limit on setrlimit;
+        # fall back to pinning hard to the value we want.
+        try:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (want, new_hard))
+            new_soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
+            return (soft, new_soft)
+        except (ValueError, OSError):
+            continue
+    return (soft, soft)
+
+
 def main() -> None:
     import uvicorn
+    old_soft, new_soft = _raise_fd_limit()
+    # flush=True: stdout is block-buffered when redirected to a log file, so an
+    # unflushed startup line is invisible until much later output fills the
+    # buffer — useless for confirming the limit actually moved.
+    print(f"[ds-dash] open-file limit {old_soft} -> {new_soft}", flush=True)
     cfg = load_config()
     server_cfg = cfg.get("server") or {}
     port = server_cfg.get("port", 7766)
