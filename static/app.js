@@ -826,6 +826,36 @@ function renderProcs(sys) {
       '<span class="val">' + (r[valKey] ?? 0).toFixed(1) + unit + '</span>' +
     '</div>'
   ).join(''));
+  ellipsizeProcNames();
+}
+
+// Process names are distinctive at the END: reverse-DNS bundle ids all start
+// "com.apple.…", so a trailing ellipsis truncates away the only part that
+// identifies the process. Trim from the front instead — "…WebKit.WebContent".
+//
+// Done in JS rather than the `direction: rtl` CSS trick, which relies on bidi
+// resolution: a name ending in neutral punctuation ("Slack Helper (Renderer)")
+// has that punctuation resolve to the paragraph direction and jump to the far
+// side of the string. Measuring is exact and can't reorder anything.
+function ellipsizeProcNames() {
+  document.querySelectorAll('#procs-body .proc-row .name').forEach(cell => {
+    const full = cell.dataset.full || cell.textContent;
+    cell.dataset.full = full;
+    cell.title = full;                     // hover/long-press reveals the rest
+    // Restore the full name before measuring, so the pass is idempotent and a
+    // panel that got wider (rotation) un-truncates instead of staying clipped.
+    cell.textContent = full;
+    if (cell.scrollWidth <= cell.clientWidth) return;
+
+    // Monospace, so width/length gives an exact per-character width.
+    const charW = cell.scrollWidth / full.length;
+    const budget = Math.max(1, Math.floor(cell.clientWidth / charW) - 1);
+    cell.textContent = '…' + full.slice(full.length - budget);
+    // Fractional metrics can leave it a hair over; shave at most a few chars.
+    for (let i = 0; i < 3 && cell.scrollWidth > cell.clientWidth; i++) {
+      cell.textContent = '…' + cell.textContent.slice(2);
+    }
+  });
 }
 
 document.addEventListener('click', e => {
@@ -1084,8 +1114,9 @@ function applyIpadLayout() {
     }
   }
 
-  // Row-fit depends on panel heights, which just changed.
+  // Both depend on panel geometry, which just changed.
   fitPanelRows();
+  ellipsizeProcNames();
 }
 
 applyIpadLayout();
