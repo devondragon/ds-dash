@@ -1501,7 +1501,6 @@ async def services_poll(interval: int = 300) -> None:
         "openai":    "https://status.openai.com/api/v2/summary.json",
         "github":    "https://www.githubstatus.com/api/v2/summary.json",
         "linear":    "https://linearstatus.com/api/v2/summary.json",
-        "vercel":    "https://www.vercel-status.com/api/v2/summary.json",
     }
     prev_indicators: dict[str, str] = {}
     while True:

@@ -77,8 +77,8 @@ function renderServices(p) {
   setMeta('services-meta', p);
   if (!p || p.status === 'pending') { setHtml('services-body', '<div class="dim">loading…</div>'); return; }
   const items = p.items || {};
-  const order = ['anthropic', 'openai', 'github', 'linear', 'vercel'];
-  const labelFor = { anthropic: 'ANTHROPIC API', openai: 'OPENAI API', github: 'GITHUB', linear: 'LINEAR', vercel: 'VERCEL' };
+  const order = ['anthropic', 'openai', 'github', 'linear'];
+  const labelFor = { anthropic: 'ANTHROPIC API', openai: 'OPENAI API', github: 'GITHUB', linear: 'LINEAR' };
   let okCount = 0;
   const rows = order.map(name => {
     const it = items[name] || { indicator: 'unknown' };

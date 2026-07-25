@@ -203,7 +203,7 @@ Every provider is real — there are no mock pollers in the codebase.
 | panel         | source                                                                    |
 |---------------|---------------------------------------------------------------------------|
 | github        | api.github.com (PAT in config) — REST search + GraphQL contributions      |
-| services      | public status.json endpoints (Anthropic / OpenAI / GH / Linear / Vercel)  |
+| services      | public status.json endpoints (Anthropic / OpenAI / GH / Linear)           |
 | system        | psutil — cpu, mem, disk, net (+ 5-min rolling history for trace)          |
 | calendar      | ical-buddy (Homebrew, auto-detected on macOS)                             |
 | tasks         | api.usemotion.com /v1/tasks (with recurring-template dedup)               |
