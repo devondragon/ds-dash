@@ -736,6 +736,70 @@ function renderNetwork(p) {
 }
 
 //------------------------------------------------------------------
+// Fit-to-panel row trimming
+//------------------------------------------------------------------
+// The CSS row caps bound how much data a list panel renders, but they can't
+// know how tall the panel actually is — Safari's chrome makes an iPad
+// landscape viewport anywhere from ~740 to 834px, and the cap that fits at one
+// height slices a row in half at another. Panels are `overflow: hidden`, so a
+// too-tall list gets cut mid-row: letter-tops of "VPN OFF", a usage bar sliced
+// under its own label.
+//
+// Fix by moving the cut to a row boundary, capping the body's max-height.
+//
+// The subtlety: these panels are flex items with a content-derived basis
+// (`flex: 1 1 auto`), so a cap shrinks the body, which shrinks the basis, which
+// moves the very boundary that was just measured. Measure-then-apply one panel
+// at a time and each pass reads a layout the previous pass changed — the cut
+// wanders and re-clips a row every poll.
+//
+// So the pass is phased: clear every cap first, measure all panels against that
+// one baseline layout, then apply all cuts. Same data + same viewport always
+// yields the same cuts, so it's stable across polls with no flicker. Cost is a
+// panel that can end up under-filled by up to one row; a missing row reads as
+// "list continues", a half-drawn row reads as broken.
+function rowFitTargets() {
+  const targets = [
+    [el('panel-cal'), el('cal-body'), '.cal-row, .cal-day-sep'],
+    [el('panel-tasks'), el('tasks-body'), '.task'],
+  ];
+  document.querySelectorAll('#linear-panels > .panel').forEach(p =>
+    targets.push([p, p.querySelector('[id^="linear-body-"]'), '.task']));
+  return targets.filter(([panel, body]) => panel && body);
+}
+
+function measureRowCut(panel, body, rowSelector) {
+  const rows = [...body.querySelectorAll(rowSelector)]
+    .filter(r => getComputedStyle(r).display !== 'none');
+  if (!rows.length) return null;
+
+  const limit = panel.getBoundingClientRect().bottom -
+                parseFloat(getComputedStyle(panel).paddingBottom);
+  const bodyTop = body.getBoundingClientRect().top;
+  if (bodyTop + body.scrollHeight <= limit + 0.5) return null;   // nothing is cut
+
+  // Keep the last row that fits entirely; cut at its bottom edge.
+  let cut = 0;
+  for (const row of rows) {
+    const bottom = row.getBoundingClientRect().bottom;
+    if (bottom > limit + 0.5) break;
+    cut = bottom - bodyTop;
+  }
+  return Math.max(0, Math.round(cut));
+}
+
+function fitPanelRows() {
+  const targets = rowFitTargets();
+  targets.forEach(([, body]) => { body.style.maxHeight = ''; });
+  const cuts = targets.map(([panel, body, sel]) => measureRowCut(panel, body, sel));
+  targets.forEach(([, body], i) => {
+    if (cuts[i] === null) return;
+    body.style.maxHeight = cuts[i] + 'px';
+    body.style.overflow = 'hidden';
+  });
+}
+
+//------------------------------------------------------------------
 // Top processes panel — tabbed CPU/MEM
 //------------------------------------------------------------------
 
@@ -877,6 +941,7 @@ async function poll() {
     renderProcs(p.system);
     renderRail(p.system);
     renderLeftRail(p);
+    fitPanelRows();
 
     const ticker = s.ticker || [];
     const tickerKey = ticker.length + ':' + (ticker[0] ? ticker[0].ts : '');
