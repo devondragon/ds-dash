@@ -649,6 +649,47 @@ body.offline .rec-dot { background: var(--magenta); }
 .bar .btrack { flex: 1; letter-spacing: -0.5px; color: var(--primary); }
 .bar .bval { width: 50px; text-align: right; color: var(--primary); font-size: var(--fs-md); }
 
+/* CLAUDE USAGE — the 5-hour and weekly windows sit side by side, which
+   halves the panel's height (2 lines, not 4). That matters in a
+   height-pressured column: as a non-.grow panel this one still shrinks, and
+   at 4 lines the WEEKLY row was the first thing clipped away.
+   Container-scoped, not viewport-scoped: the panel is ~485px on iPad but
+   narrower in a 3-col desktop, and only the panel's own width decides
+   whether two label+resets rows fit. Below the threshold it stacks, i.e.
+   the original layout. */
+.usage-split { display: flex; flex-direction: column; }
+.usage-block { min-width: 0; }
+/* 340px is the panel's CONTENT width (container queries measure the content
+   box, so it's ~24px less than the panel's outer width): two 160px blocks
+   plus the gap, which is what the --fs-sm label rows below need. */
+@container panel (min-width: 340px) {
+  .usage-split { flex-direction: row; gap: var(--space-6); }
+  .usage-block { flex: 1 1 0; }
+  /* Half-width blocks: two label+resets rows in the space of one. Drop the
+     label line to --fs-sm to buy the room, and if it's still tight let the
+     LABEL ellipsize — the reset time is the data, the label is guessable, and
+     either beats wrapping (which re-clips the panel we just made shorter). */
+  .usage-block .row { font-size: var(--fs-sm); gap: var(--space-3); }
+  .usage-block .row > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .usage-block .row > span:last-child { white-space: nowrap; }
+  /* Divider between the two windows: without it "resets 19:00" and "WEEKLY"
+     sit adjacent and read as one phrase. Drawn as a pseudo-element centered
+     in the flex gap so it costs zero layout width — the narrowest iPad has
+     ~1px of slack and can't spare padding for a real border. */
+  .usage-block + .usage-block { position: relative; }
+  .usage-block + .usage-block::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--space-6) / -2);
+    border-left: 1px dashed var(--primary-deeper);
+  }
+}
 
 .ok { color: var(--primary); }
 .warn { color: var(--warn); }

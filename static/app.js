@@ -105,11 +105,20 @@ function renderClaude(p) {
   const weekPct = week.percent || 0;
   const fiveCls = fivePct >= 80 ? 'warn' : 'primary';
   const weekCls = weekPct >= 80 ? 'warn' : 'primary';
+  // Two windows side by side (CSS stacks them again when the panel is too
+  // narrow — see .usage-split). Halving the panel's height need is what keeps
+  // WEEKLY visible in a height-pressured column.
   setHtml('claude-body', `
-    <div class="row"><span class="dim">5-HR WINDOW</span><span>resets ${escapeHtml(five.resets_at || '—')}</span></div>
-    <div class="bar"><span class="btrack ${fiveCls}">${fmtBar(fivePct, 12)}</span><span class="bval ${fiveCls}">${fivePct}%</span></div>
-    <div class="row"><span class="dim">WEEKLY</span><span>resets ${escapeHtml(week.resets_at || '—')}</span></div>
-    <div class="bar"><span class="btrack ${weekCls}">${fmtBar(weekPct, 12)}</span><span class="bval ${weekCls}">${weekPct}%</span></div>
+    <div class="usage-split">
+      <div class="usage-block">
+        <div class="row"><span class="dim">5-HR WINDOW</span><span>resets ${escapeHtml(five.resets_at || '—')}</span></div>
+        <div class="bar"><span class="btrack ${fiveCls}">${fmtBar(fivePct, 12)}</span><span class="bval ${fiveCls}">${fivePct}%</span></div>
+      </div>
+      <div class="usage-block">
+        <div class="row"><span class="dim">WEEKLY</span><span>resets ${escapeHtml(week.resets_at || '—')}</span></div>
+        <div class="bar"><span class="btrack ${weekCls}">${fmtBar(weekPct, 12)}</span><span class="bval ${weekCls}">${weekPct}%</span></div>
+      </div>
+    </div>
   `);
 }
 
