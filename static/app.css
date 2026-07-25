@@ -1349,11 +1349,13 @@ body.offline .offline-overlay { display: block; }
      of view. The sibling chain matches the Nth .task onward regardless of
      what non-.task siblings (e.g. cycle-strip) precede. Tasks (Motion)
      stays at 5 visible; the single Linear panel gets 8 — the room the
-     second workspace panel used to take. */
-  #tasks-body .task ~ .task ~ .task ~ .task ~ .task ~ .task {
+     second workspace panel used to take. The reflowed iPad-portrait layout
+     is excluded: Linear moves to col-1 there and sets its own caps (see the
+     .linear-col1 block). */
+  body:not(.linear-col1) #tasks-body .task ~ .task ~ .task ~ .task ~ .task ~ .task {
     display: none;
   }
-  [id^="linear-body-"] .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task {
+  body:not(.linear-col1) [id^="linear-body-"] .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task {
     display: none;
   }
 
@@ -1394,6 +1396,124 @@ body.is-ipad #panel-sessions,
 body.is-ipad #panel-scratch { display: none; }
 body.is-ipad #github-body .gh-overview-extra { display: none; }
 
+/* Row caps for the reflowed layout. applyIpadLayout() in app.js sets
+   `linear-col1` when it moves Linear into col-1, where both list panels have
+   far more room than the generic ≤1400 caps (5 / 8) assume — those are scoped
+   to :not(.linear-col1) so they don't leave the new space empty. Tasks needs
+   no cap in either orientation: the daemon tops out at 12 items and col-2
+   (Calendar + Tasks) has the height for them. Linear's cap is what col-1's
+   freed height holds without clipping the last row — 10 rows in portrait,
+   6 in landscape, where the column is half as tall.
+   Cap by hiding the Nth .task onward — never by re-showing a row with
+   `display: revert`, which drops the author `.task { display: grid }` and
+   collapses the row to an unaligned block. */
+body.linear-col1:not(.ipad-landscape) [id^="linear-body-"] .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task {
+  display: none;
+}
+body.ipad-landscape [id^="linear-body-"] .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task {
+  display: none;
+}
+
+/* ---------- iPad landscape ----------
+   The primary iPad view (applyIpadLayout sets the class). The grid is 2-col
+   over a full-width third row in ~500px of column height, so this tier trades
+   reference detail for rows that change. */
+
+/* Network: WAN / REGION / VPN are the live facts. ISP and ASN don't change
+   between reboots — they stay on larger viewports, which have the room. */
+body.ipad-landscape #network-body .net-row[data-field="isp"],
+body.ipad-landscape #network-body .net-row[data-field="asn"] {
+  display: none;
+}
+
+/* col-1's small panels hold fixed-size reference data: 4 service rows, 3
+   network rows, 2 usage bars. Every panel is shrinkable by default, so an
+   over-subscribed column spreads the shortfall across all of them — and a
+   9px deficit is enough to behead a whole row ("VPN OFF" showing as letter
+   tops, a usage bar gone under its own label). Make them rigid so the
+   shortfall lands entirely on Linear below, which is a capped list and trims
+   to fit (see trimRowsToFit in app.js). Safari's chrome puts an iPad
+   landscape viewport anywhere from ~740 to 834px tall, so this column is
+   sometimes over-subscribed and sometimes not — it has to degrade cleanly at
+   both ends rather than be tuned for one height. */
+body.is-ipad .grid > .col:first-child > .panel:not(.grow) { flex: none; }
+
+/* Top procs: the daemon sends 8. Everywhere else the panel shares a column
+   with GitHub/heatmap and only has room for 3. In landscape it owns half the
+   bottom row, so show 6 — that's the most that fits inside GitHub's natural
+   height beside it. Past 6 the whole bottom row grows taller and the height
+   comes straight out of Tasks and Calendar above, which is a bad trade. */
+body:not(.ipad-landscape) #procs-body .proc-row ~ .proc-row ~ .proc-row ~ .proc-row {
+  display: none;
+}
+body.ipad-landscape #procs-body .proc-row ~ .proc-row ~ .proc-row ~ .proc-row ~ .proc-row ~ .proc-row ~ .proc-row {
+  display: none;
+}
+
+/* Header: the chrome is fixed-cost at every size, and this is the viewport
+   that can least afford it. Trim the vertical padding and drop the clock a
+   size step — together that's the height of ~2 task rows handed back to the
+   grid. */
+body.ipad-landscape {
+  --pad-hdr-y:      var(--space-2);
+  --fs-hdr-display: var(--fs-display-sm);
+}
+
+/* Decorative serial-number stamp: 13px of the bottom row, and it says nothing. */
+body.ipad-landscape .panel-stamp { display: none; }
+
+/* Everything below assumes a viewport-locked grid, i.e. full-screen landscape.
+   At ≤1024px (Split View, Slide Over) the tablet tier releases the lock and
+   the page scrolls instead — there, panels should size to their content and
+   run off the bottom, not be squeezed into a fixed share of a short column. */
+@media (min-width: 1025px) {
+  /* The GitHub + Top-procs row is auto-sized, and a grid splits leftover space
+     evenly between auto rows — so it was taking 218px to display content that
+     needs ~180px while the three list panels above it went hungry. Size it to
+     its content and the surplus goes to the row that can use it. */
+  body.ipad-landscape .grid { grid-template-rows: 1fr max-content; }
+
+  /* Deterministic column shares. A `1 1 auto` panel sizes from its own content,
+     which makes it a moving target for fitPanelRows(): capping the body shrinks
+     the basis, which shrinks the box, which moves the boundary that was just
+     measured. With a 0 basis, height comes from the column instead — the box
+     holds still while its content is capped, so one measure-and-apply pass
+     lands exactly on a row boundary with the space fully used.
+     Only this tier needs it: everywhere else the column isn't over-subscribed,
+     nothing gets cut, and no cap is applied at all.
+     The split favours Tasks slightly; Calendar still keeps ~7 rows (today plus
+     a look at tomorrow). When applyIpadLayout() can't seat Linear in col-1 — a
+     short viewport where col-1's own panels fill it — Linear shares col-2 and
+     all three lists split it evenly instead. */
+  body.ipad-landscape #panel-cal {
+    flex: 45 1 0;
+    min-height: 0;
+  }
+  body.ipad-landscape #panel-tasks { flex: 55 1 0; }
+  body.ipad-landscape:not(.linear-col1) #panel-cal { flex: 34 1 0; }
+  body.ipad-landscape:not(.linear-col1) #panel-tasks { flex: 33 1 0; }
+  body.ipad-landscape:not(.linear-col1) #linear-panels > .panel { flex: 33 1 0; }
+  /* In col-1 Linear is the only flexible panel — its siblings are rigid — so a
+     0 basis hands it exactly the leftover height. */
+  body.ipad-landscape.linear-col1 #linear-panels > .panel { flex: 1 1 0; }
+
+  /* Two-up rows for the two panels whose content is short label + number: it
+     halves their height with nothing hidden. Services frees ~44px directly in
+     col-1, and GitHub's counts shrink the bottom row (which is max-content
+     sized above) by ~42px, which the top row inherits. Both end up in Linear,
+     the one panel in col-1 that can grow — worth ~4 rows to it. */
+  body.ipad-landscape #services-body,
+  body.ipad-landscape .gh-overview-stats,
+  body.ipad-landscape #procs-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: var(--space-7);
+  }
+  /* Procs is the taller of the two panels in the bottom row once GitHub's
+     counts are two-up, so it has to fold as well or it alone keeps that row
+     tall. Six processes in three rows; ranking reads left-to-right, then down.
+     Its panel is full-width here, so each half still has room for a name. */
+}
 
 /* Mobile (≤640px) — single col, hide MOCK-only panels.
    640 was 900: bumped down so iPad mini portrait (744) hits tablet, not mobile. */

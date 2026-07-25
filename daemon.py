@@ -1404,11 +1404,14 @@ async def claude_poll(interval: int = 300, probe_model: str = _CLAUDE_PROBE_MODE
 NET_HISTORY_SIZE = 60  # 60 samples * 5s = 5min of net trace at the default poll interval
 
 
-def _top_processes(n: int = 3) -> tuple[list[dict], list[dict]]:
+def _top_processes(n: int = 8) -> tuple[list[dict], list[dict]]:
     """Return (top_n_by_cpu, top_n_by_mem). CPU values are percent-of-one-core
     summed across threads, so an N-core machine can show values up to N*100.
     Memory is percent of physical RAM. Processes we can't read (zombies,
-    System-protected) are skipped silently."""
+    System-protected) are skipped silently.
+
+    The panel renders as many of these as its height allows (see .proc-row
+    caps in app.css), so this is the ceiling, not the display count."""
     rows: list[dict] = []
     for p in psutil.process_iter(["pid", "name"]):
         try:

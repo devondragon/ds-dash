@@ -446,11 +446,15 @@ function renderGithubView(p) {
   if (rr.items && rr.items.length) {
     prList = '<div class="dim" style="margin-top:var(--space-3);font-size:var(--fs-sm)">REVIEW REQUESTED</div>' + ghPrList(rr.items, '');
   }
+  // The four counts are wrapped so a space-pressured viewport can lay them out
+  // two-up (iPad landscape) instead of as four stacked rows.
   return `
-    <div class="row"><span class="dim">PRs awaiting review</span><span class="${rr.count > 0 ? 'warn' : 'ok'}">${rr.count}</span></div>
-    <div class="row"><span class="dim">PRs mine open</span><span>${my.count}</span></div>
-    <div class="row"><span class="dim">Issues assigned</span><span>${ia.count}</span></div>
-    <div class="row"><span class="dim">Commits today</span><span class="ok">${today}</span></div>
+    <div class="gh-overview-stats">
+      <div class="row"><span class="dim">PRs awaiting review</span><span class="${rr.count > 0 ? 'warn' : 'ok'}">${rr.count}</span></div>
+      <div class="row"><span class="dim">PRs mine open</span><span>${my.count}</span></div>
+      <div class="row"><span class="dim">Issues assigned</span><span>${ia.count}</span></div>
+      <div class="row"><span class="dim">Commits today</span><span class="ok">${today}</span></div>
+    </div>
     <div class="gh-overview-extra">${prList}</div>
   `;
 }
@@ -723,15 +727,18 @@ function renderNetwork(p) {
   const vpnLine = vpnActive
     ? (p.vpn_ifaces || []).map(i => escapeHtml(i.iface) + ' ' + escapeHtml(i.ip)).join(', ') || 'ON'
     : 'OFF';
+  // data-field lets a space-pressured viewport drop individual rows in CSS
+  // (iPad landscape hides ISP and ASN) without reshaping this list.
   const rows = [
-    ['WAN',    escapeHtml(p.wan_ip || '—'), 'ok'],
-    ['ISP',    escapeHtml((p.isp || '').trim() || '—'), ''],
-    ['REGION', escapeHtml(p.region || '—'), ''],
-    ['ASN',    escapeHtml(p.asn || '—'), ''],
-    ['VPN',    vpnLine, vpnActive ? 'warn' : 'dim'],
+    ['wan',    'WAN',    escapeHtml(p.wan_ip || '—'), 'ok'],
+    ['isp',    'ISP',    escapeHtml((p.isp || '').trim() || '—'), ''],
+    ['region', 'REGION', escapeHtml(p.region || '—'), ''],
+    ['asn',    'ASN',    escapeHtml(p.asn || '—'), ''],
+    ['vpn',    'VPN',    vpnLine, vpnActive ? 'warn' : 'dim'],
   ];
-  setHtml('network-body', rows.map(([k, v, cls]) =>
-    '<div class="net-row"><span class="k">' + k + '</span><span class="v ' + (cls || '') + '">' + v + '</span></div>'
+  setHtml('network-body', rows.map(([field, k, v, cls]) =>
+    '<div class="net-row" data-field="' + field + '"><span class="k">' + k + '</span>' +
+    '<span class="v ' + (cls || '') + '">' + v + '</span></div>'
   ).join(''));
 }
 
@@ -1011,6 +1018,78 @@ document.addEventListener('keydown', (e) => {
 //------------------------------------------------------------------
 // Boot
 //------------------------------------------------------------------
+
+// iPad column rebalance. At the tablet breakpoint the grid is 2-col and
+// `body.is-ipad` hides CC Sessions and Scratchpad — which leaves col-1 with
+// ~275px of dead space while col-2 (Calendar + Tasks + Linear) is squeezed
+// hard enough that Tasks and Linear only show a handful of rows. CSS can't
+// move a panel between grid columns, so relocate the whole #linear-panels
+// wrapper into col-1: Linear claims the empty space, Tasks inherits the
+// room Linear vacated. renderLinear() keeps working — it looks the wrapper
+// up by id and doesn't care which column owns it.
+//
+// Portrait only. That dead space is a portrait phenomenon: a landscape iPad
+// column is ~500px tall, where col-1's own three panels already fill it and
+// moving Linear in over-subscribes the column — every panel in it shrinks
+// and clips, Claude Usage included. Every iPad portrait viewport is ≥1133px
+// tall and every landscape one is ≤1024px, so height splits the two cleanly.
+// The body class tells CSS which layout is live, so the row caps can follow
+// the panel rather than guessing (see the .linear-col1 rules).
+// Every iPad portrait viewport is ≥1133px tall, every landscape one ≤1024.
+const IPAD_PORTRAIT_MIN_HEIGHT = 1100;
+
+// Sets the two layout classes CSS keys off:
+//   linear-col1     — Linear lives in col-1 (both iPad orientations)
+//   ipad-landscape  — the primary iPad view: short column, every row counts
+// Both orientations move Linear now: `body.is-ipad` hides CC Sessions and
+// Scratchpad, which leaves col-1 with dead space (~275px portrait, ~185px
+// landscape) that no panel there can claim, while col-2 carries three lists.
+// The row caps differ per orientation — see the CSS — because landscape has
+// half the column height to spend.
+// Below this, col-1 can't seat Linear usefully — a panel that holds only its
+// own title is worse than sharing col-2. Title + padding is ~43px, rows ~21px.
+const LINEAR_COL1_MIN_HEIGHT = 105;
+
+function placeLinear(inCol1) {
+  const wrapper = el('linear-panels');
+  const cols = document.querySelectorAll('.grid > .col');
+  const target = inCol1 ? cols[0] : cols[1];
+  if (wrapper.parentElement !== target) {
+    // Back into col-2 it goes ahead of Scratchpad, its markup position.
+    if (inCol1) target.appendChild(wrapper);
+    else target.insertBefore(wrapper, el('panel-scratch'));
+  }
+  document.body.classList.toggle('linear-col1', inCol1);
+}
+
+function applyIpadLayout() {
+  const isIpad = document.body.classList.contains('is-ipad');
+  const portrait = window.innerHeight >= IPAD_PORTRAIT_MIN_HEIGHT;
+  const wrapper = el('linear-panels');
+  const cols = document.querySelectorAll('.grid > .col');
+  if (!wrapper || cols.length < 2) return;
+
+  document.body.classList.toggle('ipad-landscape', isIpad && !portrait);
+  placeLinear(isIpad);
+
+  // Whether col-1 has room is a question about the actual viewport, not the
+  // device: Safari's chrome makes an iPad landscape viewport anywhere from
+  // ~740px to 834px, and at the short end col-1's own panels fill it. So try
+  // col-1, measure what Linear actually got, and fall back to col-2 if that's
+  // too thin to show rows. Measured once per boot/resize, not per poll.
+  if (isIpad) {
+    const panel = wrapper.querySelector('.panel');
+    if (panel && panel.getBoundingClientRect().height < LINEAR_COL1_MIN_HEIGHT) {
+      placeLinear(false);
+    }
+  }
+
+  // Row-fit depends on panel heights, which just changed.
+  fitPanelRows();
+}
+
+applyIpadLayout();
+window.addEventListener('resize', applyIpadLayout);
 
 renderClock();
 setInterval(renderClock, 1000);

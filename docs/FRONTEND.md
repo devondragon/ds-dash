@@ -79,6 +79,74 @@ restyling. To add a new viewport (e.g., an ultrawide block at ≥3440px),
 override the component tokens in `:root` rather than restating every
 `.panel { padding: ... }` rule.
 
+### iPad layout classes
+
+Two body classes handle what media queries can't, both set by
+`applyIpadLayout()` in `app.js` (on boot and on resize). `is-ipad` itself
+comes from the pre-paint UA check in `index.html`.
+
+| class            | when                                    | effect                                                                 |
+|------------------|-----------------------------------------|------------------------------------------------------------------------|
+| `linear-col1`    | `is-ipad` **and** col-1 has ≥105px free | `#linear-panels` is **moved in the DOM** to col-1; raises Tasks/Linear row caps |
+| `ipad-landscape` | `is-ipad` + height < 1100px             | hides Network ISP/ASN + panel stamps, 6 proc rows, shorter header, deterministic column shares |
+
+Why a DOM move: `is-ipad` hides CC Sessions and Scratchpad, so col-1 ends up
+with dead space (~275px portrait, ~185px landscape) that no panel in it can
+claim, while col-2 carries Calendar + Tasks + Linear. CSS cannot move a panel
+between grid columns, so `applyIpadLayout()` reparents the wrapper;
+`renderLinear()` is unaffected because it looks the wrapper up by id.
+
+The placement is **measured, not assumed**: Safari's chrome makes an iPad
+landscape viewport anywhere from ~740px to 834px tall, and at the short end
+col-1's own panels fill it. So `applyIpadLayout()` tries col-1, reads back what
+Linear actually got, and falls back to col-2 if it's under 105px (title only).
+
+Row caps are per-layout, since column height differs by rotation — hide the
+Nth `.task` onward with a sibling chain. Never re-show a capped row with
+`display: revert`: that discards the author `.task { display: grid }` and the
+row collapses to an unaligned block.
+
+### Why panels stop clipping mid-row
+
+`.panel` is `overflow: hidden`, so an over-subscribed column used to cut rows
+through the middle — letter-tops of "VPN OFF", a usage bar sliced under its own
+label. Three pieces prevent that, and they only work together:
+
+1. **Small panels don't shrink.** `body.is-ipad` col-1's non-`.grow` panels are
+   `flex: none`. They hold fixed-size reference data (4 service rows, 3 network
+   rows, 2 usage bars) where a 9px deficit costs a whole row, so the shortfall
+   is pushed onto the capped list below instead.
+2. **`fitPanelRows()`** caps each list body's `max-height` at the bottom edge of
+   the last row that fits. It is **phased** — clear all caps, measure all
+   panels, then apply all cuts — because measure-then-apply one panel at a time
+   reads a layout the previous panel's cap already changed.
+3. **Deterministic shares in landscape.** `flex: N 1 0` on Calendar / Tasks /
+   Linear. With a content-derived basis (`1 1 auto`) a cap shrinks the body,
+   which shrinks the basis, which moves the boundary just measured — the cut
+   wanders every poll. A 0 basis takes height from the column, so the box holds
+   still and one pass lands exactly on a row boundary.
+
+Also in landscape: `grid-template-rows: 1fr max-content`. Auto grid rows split
+leftover space evenly, which handed the GitHub/procs row ~218px for ~180px of
+content while the list panels above went hungry.
+
+**Two-up rows in landscape.** Services, the GitHub overview counts
+(`.gh-overview-stats`) and Top procs are `grid-template-columns: 1fr 1fr` — all
+three are short label + value, so folding them halves their height with nothing
+hidden. This is the space Linear runs on: Services frees ~44px directly in col-1,
+and the other two shrink the bottom row (~38px) which the top row inherits and
+col-1's only flexible panel absorbs. Worth ~4 Linear rows at a 700px viewport.
+Fold all three or none — leaving Top procs stacked makes it the tallest panel in
+the bottom row and it alone keeps that row tall, cancelling GitHub's saving.
+
+All of this is scoped to `min-width: 1025px`. Below that the tablet tier
+releases the viewport lock and the page scrolls, so panels should size to their
+content and run off the bottom (Split View, Slide Over) rather than be squeezed
+into a share of a short column.
+
+iPad landscape is the primary real-world view of this dashboard; when
+trading space, it wins.
+
 Body uses `height: 100vh; height: 100dvh;` — the second line lets iOS
 Safari respect the URL bar. Tablet/mobile blocks release the
 viewport-lock so panels stack and scroll.
