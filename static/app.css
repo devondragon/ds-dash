@@ -581,7 +581,35 @@ body.offline .rec-dot { background: var(--magenta); }
 .panel::before { inset: 0; background: var(--rule); }
 .panel::after  { inset: 1px; background: var(--bg-panel); }
 .panel > * { position: relative; z-index: 1; }
-.panel.grow { flex: 1; }
+/* `1 1 auto`, not the `flex: 1` shorthand's 0% basis: grow panels start at
+   their content height and share surplus (or shrink proportionally) from
+   there. With a basis of 0 a column whose natural content already fills it
+   leaves grow panels with nothing, and they clip to a sliver. */
+.panel.grow { flex: 1 1 auto; }
+
+/* Linear panels are wrapped in #linear-panels (a plain div), which made
+   their .grow flex props inert in col-2's flex context — they sat at
+   natural content height at every width. display:contents collapses the
+   wrapper so each Linear panel is a direct flex child of col-2 and can
+   claim the column's surplus height. `1 1 auto` (not the `flex: 1`
+   shorthand's 0% basis) so a panel starts at its content height and only
+   grows from there — a short column can't clip its rows. */
+#linear-panels { display: contents; }
+
+/* Calendar is the one col-2 panel whose content is neither capped nor
+   ranked — a clipped "today" hides real events. Opt it out of shrinking so
+   height pressure lands on the ranked/capped lists (Tasks, Linear) whose
+   tail rows are the least important thing on screen. */
+#panel-cal { flex: none; }
+
+/* Short + narrow (iPad landscape, small desktop windows): the column is too
+   height-starved for that to hold — a full day's agenda would leave Tasks
+   with ~3 rows. Let Calendar shrink again, but floored at ~5 rows so it
+   always answers "what's next"; the overflow it gives up is tomorrow's
+   preview, which is the cheapest thing in the column. */
+@media (max-width: 1400px) and (max-height: 1100px) {
+  #panel-cal { flex: 0 1 auto; min-height: 11rem; }
+}
 
 .panel-title {
   color: var(--cyan);
@@ -620,6 +648,7 @@ body.offline .rec-dot { background: var(--magenta); }
 .bar .blab { width: 40px; color: var(--primary-dim); font-size: var(--fs-sm); }
 .bar .btrack { flex: 1; letter-spacing: -0.5px; color: var(--primary); }
 .bar .bval { width: 50px; text-align: right; color: var(--primary); font-size: var(--fs-md); }
+
 
 .ok { color: var(--primary); }
 .warn { color: var(--warn); }
@@ -1275,29 +1304,22 @@ body.offline .offline-overlay { display: block; }
   .grid > .col:nth-child(3) > .panel { flex: 1; }
   .hdr .right { gap: var(--space-5); }
 
-  /* Cap rendered task rows per panel so dense Linear workspaces don't
-     crowd Tasks out of view. The .task class is shared by Tasks (Motion)
-     and every Linear panel body; the sibling chain matches the 6th .task
-     onward regardless of what non-.task siblings (e.g. cycle-strip)
-     precede, so the visible cap is 5. */
-  #tasks-body .task ~ .task ~ .task ~ .task ~ .task ~ .task,
-  [id^="linear-body-"] .task ~ .task ~ .task ~ .task ~ .task ~ .task {
+  /* Cap rendered task rows per panel so dense lists don't crowd Tasks out
+     of view. The sibling chain matches the Nth .task onward regardless of
+     what non-.task siblings (e.g. cycle-strip) precede. Tasks (Motion)
+     stays at 5 visible; the single Linear panel gets 8 — the room the
+     second workspace panel used to take. */
+  #tasks-body .task ~ .task ~ .task ~ .task ~ .task ~ .task {
+    display: none;
+  }
+  [id^="linear-body-"] .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task ~ .task {
     display: none;
   }
 
-  /* Layout: at narrow widths, col-2 is height-pressured. The default
-     `.panel.grow { flex: 1 }` shorthand is `flex: 1 1 0%` — grow panels
-     start at 0 height and only get *surplus* space. When Cal + Linear's
-     natural content already fills the column, Tasks/Scratch end up with
-     zero allotment and clip to nothing. Use `flex: 1 1 auto` so grow
-     panels start at their content height and shrink proportionally if
-     the column is short, guaranteeing Tasks gets some visible height. */
-  .panel.grow { flex: 1 1 auto; }
-  /* The Linear panels live inside a #linear-panels wrapper (plain div,
-     not a flex container) which makes their .grow flex props inert in
-     col-2's flex context. display:contents collapses the wrapper so
-     each Linear panel participates as a direct flex child of col-2. */
-  #linear-panels { display: contents; }
+  /* Layout note: `.panel.grow { flex: 1 1 auto }` and
+     `#linear-panels { display: contents }` used to live here, for the
+     height-pressured narrow col-2. Both are unconditional now — see the
+     .panel.grow block above. */
 }
 
 /* Tablet (≤1024px) — covers iPad mini/standard/Pro 11/13 portrait
@@ -1330,6 +1352,7 @@ body.offline .offline-overlay { display: block; }
 body.is-ipad #panel-sessions,
 body.is-ipad #panel-scratch { display: none; }
 body.is-ipad #github-body .gh-overview-extra { display: none; }
+
 
 /* Mobile (≤640px) — single col, hide MOCK-only panels.
    640 was 900: bumped down so iPad mini portrait (744) hits tablet, not mobile. */

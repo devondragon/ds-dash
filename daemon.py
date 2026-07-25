@@ -924,7 +924,7 @@ async def motion_poll(api_key: str, interval: int = 60) -> None:
 # to the workspace's show_state_types) + cycles(isActive).
 
 LINEAR_API = "https://api.linear.app/graphql"
-_LINEAR_MAX_ITEMS = 8           # how many issues we render per panel
+_LINEAR_MAX_ITEMS = 16          # how many issues we render per panel
 _LINEAR_MIN_INTERVAL = 60        # floor for poll_seconds
 _LINEAR_DEFAULT_INTERVAL = 90
 # Default visible states. Linear's WorkflowState.type enum values:
