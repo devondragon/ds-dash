@@ -1173,25 +1173,20 @@ _CLAUDE_PROBE_MODEL_DEFAULT = "claude-haiku-4-5-20251001"
 _CLAUDE_KEYCHAIN_SERVICE = "Claude Code-credentials"
 
 
-def _read_claude_oauth() -> dict | None:
-    """Read Claude Code's OAuth credentials from file or macOS keychain.
-
-    Returns {"access_token": str, "expires_at_ms": int | None} on success, or
-    None if no credentials are found. Raises on parse failure so the caller
-    can surface the underlying error.
-    """
-    raw: str | None = None
+def _claude_oauth_blobs() -> list[str]:
+    """Raw credential JSON from every store Claude Code might be using."""
+    raws: list[str] = []
     for f in (Path.home() / ".claude" / ".credentials.json",
               Path.home() / ".claude" / "credentials.json"):
         if f.is_file():
             try:
                 raw = f.read_text(encoding="utf-8").strip()
-                if raw:
-                    break
             except OSError:
                 continue
+            if raw:
+                raws.append(raw)
 
-    if not raw and sys.platform == "darwin":
+    if sys.platform == "darwin":
         try:
             r = subprocess.run(
                 ["/usr/bin/security", "find-generic-password",
@@ -1200,20 +1195,51 @@ def _read_claude_oauth() -> dict | None:
                  "-w"],
                 capture_output=True, text=True, timeout=3,
             )
-            if r.returncode == 0:
-                raw = r.stdout.strip()
+            if r.returncode == 0 and r.stdout.strip():
+                raws.append(r.stdout.strip())
         except (OSError, subprocess.TimeoutExpired):
             pass
 
-    if not raw:
+    return raws
+
+
+def _read_claude_oauth() -> dict | None:
+    """Read Claude Code's OAuth credentials from file or macOS keychain.
+
+    Reads EVERY store and returns the freshest token rather than the first
+    one found. On macOS, Claude Code keeps the keychain entry refreshed (the
+    access token lives ~hours) but can leave a stale
+    ~/.claude/.credentials.json behind — a first-match read picks up that
+    months-dead file and the panel reports "token expired" forever while a
+    live credential sits in the keychain.
+
+    Returns {"access_token": str, "expires_at_ms": int | None} for the
+    credential with the latest expiry, or None if no store has one. A
+    credential with no expiresAt sorts last: it can't be shown to be live.
+    Raises the parse failure only if NO store yielded a usable token, so one
+    corrupt blob can't mask a good one.
+    """
+    creds: list[dict] = []
+    parse_error: Exception | None = None
+    for raw in _claude_oauth_blobs():
+        try:
+            oa = (json.loads(raw) or {}).get("claudeAiOauth") or {}
+        except (json.JSONDecodeError, AttributeError) as e:
+            parse_error = e
+            continue
+        if oa.get("accessToken"):
+            creds.append({
+                "access_token": oa["accessToken"],
+                "expires_at_ms": oa.get("expiresAt"),
+            })
+
+    if not creds:
+        if parse_error is not None:
+            raise parse_error
         return None
 
-    data = json.loads(raw)
-    oa = data.get("claudeAiOauth") or {}
-    tok = oa.get("accessToken")
-    if not tok:
-        return None
-    return {"access_token": tok, "expires_at_ms": oa.get("expiresAt")}
+    creds.sort(key=lambda c: c["expires_at_ms"] or 0, reverse=True)
+    return creds[0]
 
 
 async def _fetch_claude_usage_headers(access_token: str, probe_model: str) -> dict:
